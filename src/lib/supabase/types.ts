@@ -1,5 +1,5 @@
 export type UserRole = "owner" | "operator" | "vet" | "consultant";
-export type Species = "sheep" | "goat" | "cattle" | "camel";
+export type Species = "sheep" | "goat" | "cattle" | "camel" | "horse";
 export type AnimalStatus = "active" | "sold" | "dead";
 export type DiseaseType =
   | "respiratory"
@@ -8,7 +8,18 @@ export type DiseaseType =
   | "infectious"
   | "lameness"
   | "other";
-export type FeedType = "hay" | "straw" | "flour" | "soybean" | "concentrate";
+export type FeedType =
+  | "hay"
+  | "straw"
+  | "flour"
+  | "soybean"
+  | "concentrate"
+  | "barley"
+  | "corn"
+  | "wheat_bran"
+  | "salt"
+  | "mineral_supplements"
+  | "custom";
 export type FeedUnit = "kg" | "ton" | "bag";
 export type NotificationType = "feed_low" | "disease_alert" | "ai_suggestion" | "system";
 
@@ -104,8 +115,8 @@ export interface BirthRecord {
   farm_id: string;
   mother_id: string;
   father_id: string | null;
-  offspring_count: number;
-  gender: string | null;
+  male_offspring_count: number;
+  female_offspring_count: number;
   birth_date: string;
   notes: string | null;
   created_by: string | null;
@@ -131,8 +142,10 @@ export interface FeedInventory {
   id: string;
   farm_id: string;
   feed_type: FeedType;
+  custom_label: string | null;
   quantity: number;
   unit: FeedUnit;
+  unit_cost: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

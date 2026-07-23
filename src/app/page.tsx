@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { Logo } from "@/components/logo";
 
 export default function Home() {
   const router = useRouter();
@@ -20,8 +21,8 @@ export default function Home() {
   }, [loading, session, profile, router]);
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-background text-center">
-      <h1 className="text-3xl font-bold text-primary">گله‌یار</h1>
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-background text-center">
+      <Logo size={72} />
       <p className="text-muted-foreground">در حال بارگذاری…</p>
     </div>
   );

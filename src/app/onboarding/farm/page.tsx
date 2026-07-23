@@ -68,7 +68,7 @@ export default function CreateFarmPage() {
 
     if (farmError) {
       setSubmitting(false);
-      toast.error("ثبت مزرعه ناموفق بود. دوباره تلاش کنید.");
+      toast.error(`ثبت مزرعه ناموفق بود: ${farmError.message}`);
       return;
     }
 
@@ -80,7 +80,7 @@ export default function CreateFarmPage() {
     setSubmitting(false);
 
     if (userError) {
-      toast.error("اتصال مزرعه به حساب شما ناموفق بود.");
+      toast.error(`اتصال مزرعه به حساب شما ناموفق بود: ${userError.message}`);
       return;
     }
 

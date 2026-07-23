@@ -12,11 +12,14 @@ import {
   Sparkles,
   Settings,
   Home as HomeIcon,
+  Wheat,
+  ArrowRight,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 import type { UserRole } from "@/lib/supabase/types";
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard };
@@ -27,6 +30,7 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
     { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
     { href: "/animals", label: "دام‌ها", icon: PawPrint },
     { href: "/register", label: "ثبت", icon: ClipboardPlus },
+    { href: "/feed", label: "خوراک", icon: Wheat },
     { href: "/reports", label: "گزارش", icon: BarChart3 },
     { href: "/ai", label: "دستیار", icon: Sparkles },
   ],
@@ -47,6 +51,44 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   ],
 };
 
+/** Every route reachable in the app, so a sub-page's top bar can show a real title instead of the brand mark. */
+const PAGE_TITLES: Record<string, string> = {
+  "/animals/new": "ثبت / ویرایش دام",
+  "/animals/view": "مشخصات دام",
+  "/register/milk": "ثبت شیر",
+  "/register/weight": "ثبت وزن",
+  "/register/disease": "ثبت بیماری",
+  "/register/birth": "ثبت زایمان",
+  "/register/treatment": "ثبت درمان",
+  "/settings": "تنظیمات",
+  "/feed": "مدیریت خوراک",
+  "/reports": "گزارش‌ها و تحلیل",
+  "/ai": "دستیار هوشمند",
+};
+
+/** Routes that show the brand mark + settings gear instead of a back button — the roots of each bottom-nav tab. */
+const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/register", "/history", "/home"]);
+
+/**
+ * Fallback destination when there's no browser history to go back to — e.g.
+ * a PWA launched straight into a deep link, or a page opened in a new tab.
+ * router.back() is silently a no-op in that case, so we detect an empty
+ * history stack and push here instead.
+ */
+const BACK_FALLBACK: Record<string, string> = {
+  "/animals/new": "/animals",
+  "/animals/view": "/animals",
+  "/register/milk": "/register",
+  "/register/weight": "/register",
+  "/register/disease": "/register",
+  "/register/birth": "/register",
+  "/register/treatment": "/register",
+  "/settings": "/dashboard",
+  "/feed": "/dashboard",
+  "/reports": "/dashboard",
+  "/ai": "/dashboard",
+};
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -65,18 +107,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading || !session || !profile?.farm_id) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-background">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-background">
+        <Logo size={56} />
         <p className="text-muted-foreground">در حال بارگذاری…</p>
       </div>
     );
   }
 
   const navItems = NAV_BY_ROLE[profile.role];
+  const isTopLevel = TOP_LEVEL_PATHS.has(pathname);
+  const title = PAGE_TITLES[pathname];
+
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(BACK_FALLBACK[pathname] ?? "/dashboard");
+    }
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
-        <span className="text-lg font-bold text-primary">گله‌یار</span>
+        {isTopLevel ? (
+          <span className="flex items-center gap-2">
+            <Logo size={28} />
+            <span className="text-lg font-bold text-primary">گله‌یار</span>
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={goBack} aria-label="بازگشت">
+              <ArrowRight className="size-5" />
+            </Button>
+            <span className="text-base font-bold">{title ?? "گله‌یار"}</span>
+          </span>
+        )}
         <Button variant="ghost" size="icon" asChild>
           <Link href="/settings">
             <Settings className="size-5" />

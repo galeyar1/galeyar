@@ -19,6 +19,27 @@ const MILK_WINDOW_DAYS = 7;
 const HERD_LOOKBACK_MONTHS = 6;
 const PROJECTION_MONTHS = 12;
 
+// Kept in sync with src/lib/feed-labels.ts by hand — this function runs on
+// Deno and can't import from the Next.js app's module graph.
+const FEED_TYPE_LABELS_FA: Record<string, string> = {
+  hay: "یونجه",
+  straw: "کاه",
+  flour: "آرد",
+  soybean: "سویا",
+  concentrate: "کنسانتره",
+  barley: "جو",
+  corn: "ذرت",
+  wheat_bran: "سبوس گندم",
+  salt: "نمک",
+  mineral_supplements: "مکمل معدنی",
+  custom: "سایر",
+};
+
+function feedLabelFa(feedType: string, customLabel: string | null): string {
+  if (feedType === "custom") return customLabel || FEED_TYPE_LABELS_FA.custom;
+  return FEED_TYPE_LABELS_FA[feedType] ?? feedType;
+}
+
 interface Farm {
   id: string;
 }
@@ -29,7 +50,7 @@ async function computeFeedForecast(farmId: string) {
 
   const { data: inventory } = await supabase
     .from("feed_inventory")
-    .select("feed_type, quantity, unit")
+    .select("feed_type, custom_label, quantity, unit")
     .eq("farm_id", farmId);
 
   const { data: consumption } = await supabase
@@ -53,6 +74,7 @@ async function computeFeedForecast(farmId: string) {
     const daysRemaining = dailyAvg > 0 ? Math.floor(Number(item.quantity) / dailyAvg) : null;
     return {
       feed_type: item.feed_type,
+      custom_label: item.custom_label ?? null,
       quantity: item.quantity,
       unit: item.unit,
       daily_avg_consumption: Number(dailyAvg.toFixed(2)),
@@ -172,7 +194,7 @@ Deno.serve(async () => {
         lowFeed.map((f) => ({
           farm_id: farm.id,
           type: "feed_low",
-          message: `موجودی ${f.feed_type} تا حدود ${f.days_remaining} روز دیگر تمام می‌شود.`,
+          message: `موجودی ${feedLabelFa(f.feed_type, f.custom_label)} تا حدود ${f.days_remaining} روز دیگر تمام می‌شود.`,
         }))
       );
     }

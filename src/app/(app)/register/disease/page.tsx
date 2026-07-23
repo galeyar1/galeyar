@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
 import { Camera } from "lucide-react";
 
@@ -16,8 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AnimalPicker } from "@/components/animal-picker";
+import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { createRecord } from "@/lib/sync/repository";
+import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { supabase } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/jalali";
 import type { DiseaseType } from "@/lib/supabase/types";
@@ -31,7 +33,7 @@ const DISEASE_LABELS: Record<DiseaseType, string> = {
   other: "سایر",
 };
 
-export default function NewDiseaseRecordPage() {
+function DiseaseForm({ recordId }: { recordId: string | null }) {
   const router = useRouter();
   const { profile, session } = useAuth();
   const [animalId, setAnimalId] = useState("");
@@ -41,13 +43,25 @@ export default function NewDiseaseRecordPage() {
   const [image, setImage] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const existing = useLiveQuery(() => (recordId ? db.disease_records.get(recordId) : undefined), [recordId]);
+
+  useEffect(() => {
+    if (existing) {
+      setAnimalId(existing.animal_id);
+      setDiseaseType(existing.disease_type);
+      setDescription(existing.description ?? "");
+      setRecordDate(existing.record_date);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing?.id]);
+
   const canSubmit = animalId && diseaseType;
 
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
     setSubmitting(true);
 
-    let imageUrl: string | null = null;
+    let imageUrl: string | null = existing?.image_url ?? null;
     if (image) {
       if (!navigator.onLine) {
         toast.warning("چون آفلاین هستید، عکس بارگذاری نشد؛ گزارش بدون عکس ثبت می‌شود");
@@ -58,22 +72,29 @@ export default function NewDiseaseRecordPage() {
       }
     }
 
-    await createRecord("disease_records", profile.farm_id, session.user.id, {
+    const payload = {
       animal_id: animalId,
       disease_type: diseaseType,
       description: description || null,
       image_url: imageUrl,
       record_date: recordDate,
-    });
+    };
+
+    if (recordId) {
+      await updateRecord("disease_records", recordId, payload);
+      toast.success("بیماری به‌روزرسانی شد");
+    } else {
+      await createRecord("disease_records", profile.farm_id, session.user.id, payload);
+      toast.success("بیماری با موفقیت ثبت شد");
+    }
 
     setSubmitting(false);
-    toast.success("بیماری با موفقیت ثبت شد");
     router.push("/register");
   }
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <h1 className="text-xl font-bold">ثبت بیماری</h1>
+      <h1 className="text-xl font-bold">{recordId ? "ویرایش بیماری" : "ثبت بیماری"}</h1>
 
       <div className="flex flex-col gap-2">
         <label className="text-base">دام *</label>
@@ -110,7 +131,7 @@ export default function NewDiseaseRecordPage() {
         <label className="text-base">عکس (اختیاری)</label>
         <label className="flex h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-input text-muted-foreground">
           <Camera className="size-5" />
-          {image ? image.name : "افزودن عکس"}
+          {image ? image.name : existing?.image_url ? "عکس قبلی موجود است — برای تغییر انتخاب کنید" : "افزودن عکس"}
           <input
             type="file"
             accept="image/*"
@@ -122,8 +143,21 @@ export default function NewDiseaseRecordPage() {
       </div>
 
       <Button size="lg" className="h-14 text-lg" disabled={!canSubmit || submitting} onClick={onSubmit}>
-        {submitting ? "در حال ثبت…" : "ثبت بیماری"}
+        {submitting ? "در حال ثبت…" : recordId ? "ذخیره تغییرات" : "ثبت بیماری"}
       </Button>
     </div>
+  );
+}
+
+function DiseaseFormInner() {
+  const params = useSearchParams();
+  return <DiseaseForm recordId={params.get("id")} />;
+}
+
+export default function NewDiseaseRecordPage() {
+  return (
+    <Suspense fallback={null}>
+      <DiseaseFormInner />
+    </Suspense>
   );
 }

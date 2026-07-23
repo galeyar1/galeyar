@@ -2,15 +2,21 @@
 
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Milk, Weight, Stethoscope, Baby, Pill } from "lucide-react";
+import { Milk, Weight, Stethoscope, Baby, Pill, Pencil } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { formatJalali } from "@/lib/jalali";
+import { Button } from "@/components/ui/button";
+import { DeleteIconButton } from "@/components/confirm-dialog";
+import { softDeleteRecord } from "@/lib/sync/repository";
+import { formatJalali, toPersianDigits } from "@/lib/jalali";
+import type { SyncableTable } from "@/lib/supabase/types";
 
 interface FeedEntry {
   id: string;
+  table: SyncableTable;
   animalId: string | null;
+  editHref: string;
   date: string;
   createdAt: string;
   icon: typeof Milk;
@@ -31,6 +37,8 @@ const DISEASE_LABELS: Record<string, string> = {
 export default function HistoryPage() {
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
+  const canEdit = profile?.role === "owner" || profile?.role === "operator";
+  const canDelete = profile?.role === "owner";
 
   const feed = useLiveQuery(async () => {
     if (!farmId) return [];
@@ -51,7 +59,9 @@ export default function HistoryPage() {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "milk_records" as SyncableTable,
           animalId: r.animal_id,
+          editHref: `/register/milk?id=${r.id}`,
           date: r.record_date,
           createdAt: r.created_at,
           icon: Milk,
@@ -63,7 +73,9 @@ export default function HistoryPage() {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "weight_records" as SyncableTable,
           animalId: r.animal_id,
+          editHref: `/register/weight?id=${r.id}`,
           date: r.record_date,
           createdAt: r.created_at,
           icon: Weight,
@@ -75,7 +87,9 @@ export default function HistoryPage() {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "disease_records" as SyncableTable,
           animalId: r.animal_id,
+          editHref: `/register/disease?id=${r.id}`,
           date: r.record_date,
           createdAt: r.created_at,
           icon: Stethoscope,
@@ -87,19 +101,23 @@ export default function HistoryPage() {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "birth_records" as SyncableTable,
           animalId: r.mother_id,
+          editHref: `/register/birth?id=${r.id}`,
           date: r.birth_date,
           createdAt: r.created_at,
           icon: Baby,
           color: "text-success",
           title: `زایمان — ${earTagOf.get(r.mother_id) ?? "؟"}`,
-          detail: `${r.offspring_count} نوزاد`,
+          detail: `${toPersianDigits(r.male_offspring_count)} نر، ${toPersianDigits(r.female_offspring_count)} ماده`,
         })),
       ...treatments
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "treatments" as SyncableTable,
           animalId: r.animal_id,
+          editHref: `/register/treatment?id=${r.id}`,
           date: r.treatment_date,
           createdAt: r.created_at,
           icon: Pill,
@@ -122,10 +140,10 @@ export default function HistoryPage() {
 
       <ul className="flex flex-col gap-2">
         {feed?.map((entry) => (
-          <li key={entry.id}>
+          <li key={entry.id} className="flex items-start gap-1 rounded-xl border border-border bg-card p-3">
             <Link
               href={entry.animalId ? `/animals/view?id=${entry.animalId}` : "#"}
-              className="flex items-start gap-3 rounded-xl border border-border bg-card p-3"
+              className="flex flex-1 items-start gap-3"
             >
               <entry.icon className={`mt-0.5 size-5 shrink-0 ${entry.color}`} />
               <div className="flex flex-1 flex-col">
@@ -136,6 +154,14 @@ export default function HistoryPage() {
                 {entry.detail && <span className="text-sm text-muted-foreground">{entry.detail}</span>}
               </div>
             </Link>
+            {canEdit && (
+              <Button variant="ghost" size="icon-sm" asChild aria-label="ویرایش">
+                <Link href={entry.editHref}>
+                  <Pencil className="size-4" />
+                </Link>
+              </Button>
+            )}
+            {canDelete && <DeleteIconButton onDelete={() => softDeleteRecord(entry.table, entry.id)} />}
           </li>
         ))}
       </ul>

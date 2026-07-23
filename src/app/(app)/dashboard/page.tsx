@@ -3,17 +3,38 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Milk, PawPrint, Wheat, Stethoscope, Bell, Weight, Baby, Pill } from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
+import { Milk, PawPrint, Wheat, Stethoscope, Bell, Weight, Baby, Pill, AlertTriangle } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SPECIES_LABELS } from "@/lib/animal-labels";
-import { FEED_TYPE_LABELS } from "@/lib/feed-labels";
+import { feedLabel } from "@/lib/feed-labels";
 import { todayIso, toPersianDigits } from "@/lib/jalali";
-import type { AiInsight, FeedInventory, NotificationRow } from "@/lib/supabase/types";
+import type {
+  AiInsight,
+  FeedInventory,
+  FeedConsumptionLog,
+  FeedType,
+  NotificationRow,
+} from "@/lib/supabase/types";
+
+const CONSUMPTION_WINDOW_DAYS = 30;
 
 const CHART_COLORS = ["#1B5E20", "#66BB6A", "#A5D6A7", "#2E7D32"];
 
@@ -43,6 +64,7 @@ export default function DashboardPage() {
   const canSeeManagement = profile?.role === "owner" || profile?.role === "consultant";
 
   const [feedInventory, setFeedInventory] = useState<FeedInventory[]>([]);
+  const [feedConsumption, setFeedConsumption] = useState<FeedConsumptionLog[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [insights, setInsights] = useState<AiInsight[]>([]);
 
@@ -54,6 +76,15 @@ export default function DashboardPage() {
       .select("*")
       .eq("farm_id", farmId)
       .then(({ data }) => setFeedInventory(data ?? []));
+
+    const since = new Date();
+    since.setDate(since.getDate() - CONSUMPTION_WINDOW_DAYS);
+    supabase
+      .from("feed_consumption_log")
+      .select("*")
+      .eq("farm_id", farmId)
+      .gte("log_date", since.toISOString().slice(0, 10))
+      .then(({ data }) => setFeedConsumption(data ?? []));
 
     supabase
       .from("notifications")
@@ -149,6 +180,45 @@ export default function DashboardPage() {
     return entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 5);
   }, [farmId]);
 
+  const birthTrend = useLiveQuery(async () => {
+    if (!farmId) return [];
+    const rows = await db.birth_records.where("farm_id").equals(farmId).toArray();
+    const byMonth = new Map<string, number>();
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = d.toISOString().slice(0, 7);
+      months.push(key);
+      byMonth.set(key, 0);
+    }
+    for (const r of rows) {
+      if (r.deleted_at) continue;
+      const key = r.birth_date.slice(0, 7);
+      if (byMonth.has(key)) {
+        byMonth.set(key, (byMonth.get(key) ?? 0) + r.male_offspring_count + r.female_offspring_count);
+      }
+    }
+    return months.map((m) => ({ month: m.slice(5), value: byMonth.get(m) ?? 0 }));
+  }, [farmId]);
+
+  const herdGrowthSeries = useLiveQuery(async () => {
+    if (!farmId) return [];
+    const rows = await db.animals.where("farm_id").equals(farmId).toArray();
+    const active = rows.filter((a) => !a.deleted_at);
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      months.push(d.toISOString().slice(0, 7));
+    }
+    return months.map((m) => {
+      const cutoff = `${m}-31`;
+      const count = active.filter((a) => a.created_at.slice(0, 10) <= cutoff).length;
+      return { month: m.slice(5), value: count };
+    });
+  }, [farmId]);
+
   const herdComposition = (animals ?? []).reduce<Record<string, number>>((acc, a) => {
     acc[a.species] = (acc[a.species] ?? 0) + 1;
     return acc;
@@ -158,6 +228,22 @@ export default function DashboardPage() {
     name: SPECIES_LABELS[species as keyof typeof SPECIES_LABELS] ?? species,
     value: count,
   }));
+
+  const feedConsumptionChartData = feedInventory.map((item) => ({
+    name: feedLabel(item),
+    value: feedConsumption
+      .filter((c) => c.feed_type === item.feed_type)
+      .reduce((sum, c) => sum + Number(c.amount_used), 0),
+  }));
+
+  const feedAlerts = feedInventory.filter((item) => {
+    const monthly = feedConsumption
+      .filter((c) => c.feed_type === item.feed_type)
+      .reduce((sum, c) => sum + Number(c.amount_used), 0);
+    const dailyAvg = monthly / CONSUMPTION_WINDOW_DAYS;
+    const remaining = dailyAvg > 0 ? Math.floor(item.quantity / dailyAvg) : null;
+    return remaining !== null && remaining <= 14;
+  });
 
   const feedForecast = insights.find((i) => i.insight_type === "feed_forecast");
   const herdGrowth = insights.find((i) => i.insight_type === "herd_growth");
@@ -180,6 +266,9 @@ export default function DashboardPage() {
         <StatCard icon={Stethoscope} label="بیماری (۳۰ روز اخیر)" value={toPersianDigits(activeDiseaseCount ?? 0)} />
         {canSeeManagement && (
           <StatCard icon={Bell} label="هشدارها" value={toPersianDigits(notifications.length)} />
+        )}
+        {canSeeManagement && (
+          <StatCard icon={AlertTriangle} label="هشدار خوراک" value={toPersianDigits(feedAlerts.length)} />
         )}
       </div>
 
@@ -204,6 +293,63 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {canSeeManagement && (
+        <Card>
+          <CardHeader>
+            <CardTitle>رشد گله (۶ ماه اخیر)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={herdGrowthSeries ?? []}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis fontSize={11} allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="value" stroke="#1B5E20" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {canSeeManagement && (
+        <Card>
+          <CardHeader>
+            <CardTitle>روند زایمان (۶ ماه اخیر)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={birthTrend ?? []}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis fontSize={11} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#66BB6A" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {canSeeManagement && feedConsumptionChartData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>مصرف خوراک (۳۰ روز اخیر)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={feedConsumptionChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#EF6C00" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -236,10 +382,15 @@ export default function DashboardPage() {
           <CardContent>
             {feedForecast ? (
               <ul className="flex flex-col gap-2">
-                {(feedForecast.payload as { feed_type: string; days_remaining: number | null }[]).map(
-                  (f) => (
+                {(
+                  feedForecast.payload as {
+                    feed_type: FeedType;
+                    custom_label: string | null;
+                    days_remaining: number | null;
+                  }[]
+                ).map((f) => (
                     <li key={f.feed_type} className="flex justify-between text-sm">
-                      <span>{FEED_TYPE_LABELS[f.feed_type as keyof typeof FEED_TYPE_LABELS] ?? f.feed_type}</span>
+                      <span>{feedLabel(f)}</span>
                       <span className={f.days_remaining !== null && f.days_remaining <= 14 ? "text-destructive" : ""}>
                         {f.days_remaining !== null
                           ? `${toPersianDigits(f.days_remaining)} روز باقی‌مانده`

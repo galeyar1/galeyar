@@ -68,7 +68,10 @@ export default function SettingsPage() {
   async function saveProfile() {
     if (!session) return;
     const { error } = await supabase.from("users").update({ full_name: fullName }).eq("id", session.user.id);
-    if (error) return toast.error("ذخیره نام ناموفق بود");
+    if (error) {
+      toast.error(`ذخیره نام ناموفق بود: ${error.message}`);
+      return;
+    }
     await refreshProfile();
     toast.success("نام ذخیره شد");
   }
@@ -79,7 +82,10 @@ export default function SettingsPage() {
       .from("farms")
       .update({ farm_name: farm.farm_name, province: farm.province, city: farm.city })
       .eq("id", farm.id);
-    if (error) return toast.error("ذخیره اطلاعات مزرعه ناموفق بود");
+    if (error) {
+      toast.error(`ذخیره اطلاعات مزرعه ناموفق بود: ${error.message}`);
+      return;
+    }
     toast.success("اطلاعات مزرعه ذخیره شد");
   }
 
@@ -95,7 +101,10 @@ export default function SettingsPage() {
       role: inviteRole,
       invited_by: session.user.id,
     });
-    if (error) return toast.error("دعوت ناموفق بود (شاید قبلاً ثبت شده)");
+    if (error) {
+      toast.error(`دعوت ناموفق بود: ${error.message}`);
+      return;
+    }
     setInvitePhone("");
     toast.success("دعوت‌نامه ارسال شد. با اولین ورود این شماره به گله‌یار، فعال می‌شود.");
     void loadFarmData();

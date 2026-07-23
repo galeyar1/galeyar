@@ -1,19 +1,26 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Milk, Weight, Stethoscope, Baby, Pill } from "lucide-react";
+import { Milk, Weight, Stethoscope, Baby, Pill, Pencil } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { Badge } from "@/components/ui/badge";
-import { SPECIES_LABELS, ANIMAL_STATUS_LABELS } from "@/lib/animal-labels";
-import { formatJalali } from "@/lib/jalali";
+import { Button } from "@/components/ui/button";
+import { DeleteIconButton } from "@/components/confirm-dialog";
+import { softDeleteRecord } from "@/lib/sync/repository";
+import { SPECIES_LABELS, ANIMAL_STATUS_LABELS, animalTypeLabel } from "@/lib/animal-labels";
+import { formatJalali, toPersianDigits } from "@/lib/jalali";
+import type { SyncableTable } from "@/lib/supabase/types";
 
 interface TimelineEntry {
   id: string;
+  table: SyncableTable;
   date: string;
+  editHref: string;
   icon: typeof Milk;
   color: string;
   title: string;
@@ -30,8 +37,11 @@ const DISEASE_LABELS: Record<string, string> = {
 };
 
 function AnimalDetail({ animalId }: { animalId: string }) {
+  const router = useRouter();
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
+  const canEdit = profile?.role === "owner" || profile?.role === "operator";
+  const canDelete = profile?.role === "owner";
 
   const animal = useLiveQuery(() => db.animals.get(animalId), [animalId]);
 
@@ -51,7 +61,9 @@ function AnimalDetail({ animalId }: { animalId: string }) {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "milk_records" as SyncableTable,
           date: r.record_date,
+          editHref: `/register/milk?id=${r.id}`,
           icon: Milk,
           color: "text-primary",
           title: "ثبت شیر",
@@ -61,7 +73,9 @@ function AnimalDetail({ animalId }: { animalId: string }) {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "weight_records" as SyncableTable,
           date: r.record_date,
+          editHref: `/register/weight?id=${r.id}`,
           icon: Weight,
           color: "text-primary",
           title: "ثبت وزن",
@@ -71,7 +85,9 @@ function AnimalDetail({ animalId }: { animalId: string }) {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "disease_records" as SyncableTable,
           date: r.record_date,
+          editHref: `/register/disease?id=${r.id}`,
           icon: Stethoscope,
           color: "text-destructive",
           title: `بیماری: ${DISEASE_LABELS[r.disease_type] ?? r.disease_type}`,
@@ -81,17 +97,21 @@ function AnimalDetail({ animalId }: { animalId: string }) {
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "birth_records" as SyncableTable,
           date: r.birth_date,
+          editHref: `/register/birth?id=${r.id}`,
           icon: Baby,
           color: "text-success",
           title: "زایمان",
-          detail: `${r.offspring_count} نوزاد`,
+          detail: `${toPersianDigits(r.male_offspring_count)} نر، ${toPersianDigits(r.female_offspring_count)} ماده`,
         })),
       ...treatments
         .filter((r) => !r.deleted_at)
         .map((r) => ({
           id: r.id,
+          table: "treatments" as SyncableTable,
           date: r.treatment_date,
+          editHref: `/register/treatment?id=${r.id}`,
           icon: Pill,
           color: "text-success",
           title: `درمان: ${r.medication}`,
@@ -114,12 +134,32 @@ function AnimalDetail({ animalId }: { animalId: string }) {
             {animal.name ? `${animal.name} — ` : ""}
             {animal.ear_tag}
           </h1>
-          <Badge variant={animal.status === "active" ? "default" : "secondary"}>
-            {ANIMAL_STATUS_LABELS[animal.status]}
-          </Badge>
+          <div className="flex items-center gap-1">
+            <Badge variant={animal.status === "active" ? "default" : "secondary"}>
+              {ANIMAL_STATUS_LABELS[animal.status]}
+            </Badge>
+            {canEdit && (
+              <Button variant="ghost" size="icon-sm" asChild aria-label="ویرایش دام">
+                <Link href={`/animals/new?id=${animal.id}`}>
+                  <Pencil className="size-4" />
+                </Link>
+              </Button>
+            )}
+            {canDelete && (
+              <DeleteIconButton
+                title="حذف دام"
+                description={`آیا از حذف ${animal.ear_tag} مطمئن هستید؟ تاریخچه ثبت‌شده آن نیز از فهرست‌ها مخفی می‌شود.`}
+                onDelete={async () => {
+                  await softDeleteRecord("animals", animal.id);
+                  router.push("/animals");
+                }}
+              />
+            )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           {SPECIES_LABELS[animal.species]}
+          {animalTypeLabel(animal.animal_type) ? ` · ${animalTypeLabel(animal.animal_type)}` : ""}
           {animal.breed ? ` · ${animal.breed}` : ""}
           {animal.birth_date ? ` · متولد ${formatJalali(animal.birth_date)}` : ""}
         </p>
@@ -141,6 +181,16 @@ function AnimalDetail({ animalId }: { animalId: string }) {
               </div>
               {entry.detail && <span className="text-sm text-muted-foreground">{entry.detail}</span>}
             </div>
+            {canEdit && (
+              <Button variant="ghost" size="icon-sm" asChild aria-label="ویرایش">
+                <Link href={entry.editHref}>
+                  <Pencil className="size-4" />
+                </Link>
+              </Button>
+            )}
+            {canDelete && (
+              <DeleteIconButton onDelete={() => softDeleteRecord(entry.table, entry.id)} />
+            )}
           </li>
         ))}
       </ul>

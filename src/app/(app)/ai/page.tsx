@@ -6,12 +6,13 @@ import { Wheat, TrendingUp, Milk, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FEED_TYPE_LABELS, FEED_UNIT_LABELS } from "@/lib/feed-labels";
+import { FEED_UNIT_LABELS, feedLabel } from "@/lib/feed-labels";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
 import type { AiInsight, FeedType, FeedUnit } from "@/lib/supabase/types";
 
 interface FeedForecastItem {
   feed_type: FeedType;
+  custom_label: string | null;
   quantity: number;
   unit: FeedUnit;
   daily_avg_consumption: number;
@@ -84,7 +85,7 @@ export default function AiAssistantPage() {
             <ul className="flex flex-col gap-2">
               {(feedForecast.payload as FeedForecastItem[]).map((f) => (
                 <li key={f.feed_type} className="flex flex-col gap-0.5 rounded-lg bg-muted p-3">
-                  <span className="font-semibold">{FEED_TYPE_LABELS[f.feed_type]}</span>
+                  <span className="font-semibold">{feedLabel(f)}</span>
                   <span className={f.days_remaining !== null && f.days_remaining <= 14 ? "text-destructive" : "text-muted-foreground"}>
                     {f.days_remaining !== null
                       ? `با روند مصرف فعلی، ${toPersianDigits(f.days_remaining)} روز دیگر تمام می‌شود`

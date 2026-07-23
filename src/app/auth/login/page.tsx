@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/form";
 import { supabase } from "@/lib/supabase/client";
 import { isValidIranianPhone, normalizeIranianPhone } from "@/lib/auth/phone";
+import { Logo } from "@/components/logo";
 
 const phoneSchema = z.object({
   phone: z.string().refine(isValidIranianPhone, {
@@ -193,8 +194,7 @@ export default function LoginPage() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 bg-background px-6 py-12">
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-3xl font-bold text-primary">گله‌یار</h1>
-        <p className="text-muted-foreground">دستیار هوشمند مدیریت دامداری</p>
+        <Logo variant="full" size={220} />
       </div>
 
       <Tabs defaultValue="phone" className="w-full max-w-sm">

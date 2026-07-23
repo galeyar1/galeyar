@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
+import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,16 @@ function VerifyForm() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-8 bg-background px-6 py-12">
+    <div className="flex flex-1 flex-col gap-8 bg-background px-6 py-12">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="self-start"
+        onClick={() => router.push("/auth/login")}
+        aria-label="بازگشت"
+      >
+        <ArrowRight className="size-5" />
+      </Button>
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold text-primary">تایید شماره موبایل</h1>
         <p className="text-muted-foreground">
