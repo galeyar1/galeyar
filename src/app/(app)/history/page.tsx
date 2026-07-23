@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Milk, Weight, Stethoscope, Baby, Pill, Pencil } from "lucide-react";
+import { Milk, Weight, Stethoscope, Baby, Pill, Pencil, Syringe } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -43,13 +43,14 @@ export default function HistoryPage() {
   const feed = useLiveQuery(async () => {
     if (!farmId) return [];
 
-    const [animals, milk, weight, disease, births, treatments] = await Promise.all([
+    const [animals, milk, weight, disease, births, treatments, vaccinations] = await Promise.all([
       db.animals.where("farm_id").equals(farmId).toArray(),
       db.milk_records.where("farm_id").equals(farmId).toArray(),
       db.weight_records.where("farm_id").equals(farmId).toArray(),
       db.disease_records.where("farm_id").equals(farmId).toArray(),
       db.birth_records.where("farm_id").equals(farmId).toArray(),
       db.treatments.where("farm_id").equals(farmId).toArray(),
+      db.vaccinations.where("farm_id").equals(farmId).toArray(),
     ]);
 
     const earTagOf = new Map(animals.map((a) => [a.id, a.ear_tag]));
@@ -124,6 +125,20 @@ export default function HistoryPage() {
           color: "text-success",
           title: `درمان — ${earTagOf.get(r.animal_id) ?? "؟"}`,
           detail: r.medication,
+        })),
+      ...vaccinations
+        .filter((r) => !r.deleted_at)
+        .map((r) => ({
+          id: r.id,
+          table: "vaccinations" as SyncableTable,
+          animalId: r.animal_id,
+          editHref: `/register/vaccination?id=${r.id}`,
+          date: r.date_given,
+          createdAt: r.created_at,
+          icon: Syringe,
+          color: "text-success",
+          title: `واکسیناسیون — ${earTagOf.get(r.animal_id) ?? "؟"}`,
+          detail: r.vaccine_name,
         })),
     ];
 

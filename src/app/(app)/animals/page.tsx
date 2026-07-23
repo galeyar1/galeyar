@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { DeleteIconButton } from "@/components/confirm-dialog";
 import { softDeleteRecord } from "@/lib/sync/repository";
-import { SPECIES_LABELS, ANIMAL_STATUS_LABELS, animalTypeLabel } from "@/lib/animal-labels";
+import { SPECIES_LABELS, ANIMAL_STATUS_LABELS, animalTypeLabel, ageInYears } from "@/lib/animal-labels";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
 import type { Local } from "@/lib/db/schema";
 import type { Species, AnimalStatus, Animal } from "@/lib/supabase/types";
@@ -28,12 +28,6 @@ import type { Species, AnimalStatus, Animal } from "@/lib/supabase/types";
 const SPECIES_ORDER: Species[] = ["sheep", "goat", "cattle", "camel", "horse"];
 
 type AgeBucket = "all" | "young" | "adult" | "mature";
-
-function ageInYears(birthDate: string | null): number | null {
-  if (!birthDate) return null;
-  const ms = Date.now() - new Date(birthDate).getTime();
-  return ms / (1000 * 60 * 60 * 24 * 365.25);
-}
 
 function matchesAge(bucket: AgeBucket, years: number | null): boolean {
   if (bucket === "all") return true;

@@ -1,3 +1,4 @@
+import { toPersianDigits } from "@/lib/jalali";
 import type { Species } from "@/lib/supabase/types";
 
 export const SPECIES_LABELS: Record<Species, string> = {
@@ -67,4 +68,26 @@ export function animalTypeLabel(animalType: string | null): string | null {
     if (match) return match.label;
   }
   return animalType;
+}
+
+/** Age in fractional years, or null when birth_date is unknown. */
+export function ageInYears(birthDate: string | null): number | null {
+  if (!birthDate) return null;
+  const ms = Date.now() - new Date(birthDate).getTime();
+  return ms / (1000 * 60 * 60 * 24 * 365.25);
+}
+
+/** Human-readable age, e.g. "۲ سال و ۳ ماه" or "۴ ماه" for under a year. */
+export function ageLabel(birthDate: string | null): string {
+  const years = ageInYears(birthDate);
+  if (years === null) return "نامشخص";
+  if (years < 1) {
+    const months = Math.max(1, Math.round(years * 12));
+    return `${toPersianDigits(months)} ماه`;
+  }
+  const wholeYears = Math.floor(years);
+  const months = Math.round((years - wholeYears) * 12);
+  return months > 0
+    ? `${toPersianDigits(wholeYears)} سال و ${toPersianDigits(months)} ماه`
+    : `${toPersianDigits(wholeYears)} سال`;
 }

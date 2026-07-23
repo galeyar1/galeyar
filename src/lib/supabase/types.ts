@@ -179,6 +179,49 @@ export interface AiInsight {
   valid_until: string | null;
 }
 
+export interface FarmMember {
+  id: string;
+  farm_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface AnimalImage {
+  id: string;
+  farm_id: string;
+  animal_id: string;
+  image_url: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface Vaccination {
+  id: string;
+  farm_id: string;
+  animal_id: string;
+  vaccine_name: string;
+  date_given: string;
+  next_due_date: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export type PedigreeRelationType = "father" | "mother";
+
+export interface PedigreeRelation {
+  id: string;
+  farm_id: string;
+  animal_id: string;
+  relation_type: PedigreeRelationType;
+  external_name: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 /** Tables that participate in offline sync (mirrored into IndexedDB). */
 export type SyncableTable =
   | "animals"
@@ -186,4 +229,5 @@ export type SyncableTable =
   | "weight_records"
   | "disease_records"
   | "birth_records"
-  | "treatments";
+  | "treatments"
+  | "vaccinations";

@@ -7,6 +7,7 @@ import type {
   SyncableTable,
   Treatment,
   UserProfile,
+  Vaccination,
   WeightRecord,
 } from "@/lib/supabase/types";
 
@@ -29,7 +30,8 @@ export interface SyncQueueItem {
 }
 
 export interface SyncMeta {
-  table: SyncableTable;
+  /** `${table}:${farmId}` — pull position must be per-farm now that an owner can switch farms, otherwise switching to a farm last touched before another farm's last pull would silently skip its older rows. */
+  key: string;
   lastPulledAt: string | null;
 }
 
@@ -45,6 +47,7 @@ class GaleyarDatabase extends Dexie {
   disease_records!: Table<Local<DiseaseRecord>, string>;
   birth_records!: Table<Local<BirthRecord>, string>;
   treatments!: Table<Local<Treatment>, string>;
+  vaccinations!: Table<Local<Vaccination>, string>;
   sync_queue!: Table<SyncQueueItem, number>;
   sync_meta!: Table<SyncMeta, string>;
   profile!: Table<CachedProfile, string>;
@@ -63,6 +66,18 @@ class GaleyarDatabase extends Dexie {
       sync_meta: "table",
       profile: "cacheKey",
     });
+
+    this.version(2)
+      .stores({
+        vaccinations: "id, farm_id, animal_id, next_due_date, sync_status, deleted_at",
+        sync_meta: "key",
+      })
+      .upgrade(async (tx) => {
+        // sync_meta's primary key changed shape (table -> `${table}:${farmId}`);
+        // it's disposable pull-position cache, so just clear it — the next
+        // sync does one full re-pull instead of carrying a mismatched key.
+        await tx.table("sync_meta").clear();
+      });
   }
 }
 

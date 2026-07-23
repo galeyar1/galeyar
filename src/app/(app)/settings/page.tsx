@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { LogOut } from "lucide-react";
@@ -180,6 +181,11 @@ export default function SettingsPage() {
             />
           </div>
           {isOwner && <Button onClick={saveFarm}>ذخیره اطلاعات دامداری</Button>}
+          {isOwner && (
+            <Button variant="outline" asChild>
+              <Link href="/farms">مدیریت مزرعه‌ها و سوییچ</Link>
+            </Button>
+          )}
         </CardContent>
       </Card>
 

@@ -10,10 +10,30 @@ const SYNC_TABLES: SyncableTable[] = [
   "disease_records",
   "birth_records",
   "treatments",
+  "vaccinations",
 ];
 
 let syncing = false;
 let queuedRerun = false;
+
+export type SyncPhase = "idle" | "syncing" | "complete";
+type Listener = (phase: SyncPhase) => void;
+const listeners = new Set<Listener>();
+
+/** Tiny pub-sub so the UI can show Online/Offline/Syncing/Sync Complete without polling. */
+export function onSyncPhaseChange(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function emitPhase(phase: SyncPhase) {
+  for (const listener of listeners) listener(phase);
+}
+
+async function currentFarmId(): Promise<string | null> {
+  const profile = await db.profile.get("current");
+  return profile?.farm_id ?? null;
+}
 
 /**
  * Runs a push-then-pull cycle. Safe to call as often as you like (online
@@ -30,11 +50,15 @@ export async function triggerSync(): Promise<void> {
   }
 
   syncing = true;
+  emitPhase("syncing");
   try {
     await pushQueue();
     await pullAll();
+    emitPhase("complete");
+    window.setTimeout(() => emitPhase("idle"), 2000);
   } catch (error) {
     console.error("galeyar sync: cycle failed", error);
+    emitPhase("idle");
   } finally {
     syncing = false;
     if (queuedRerun) {
@@ -84,18 +108,26 @@ async function pushOne(item: SyncQueueItem) {
 }
 
 async function pullAll() {
+  const farmId = await currentFarmId();
+  if (!farmId) return;
   for (const table of SYNC_TABLES) {
-    await pullTable(table);
+    await pullTable(table, farmId);
   }
 }
 
-async function pullTable(table: SyncableTable) {
-  const meta = await db.sync_meta.get(table);
+async function pullTable(table: SyncableTable, farmId: string) {
+  // Keyed per-farm: an owner can switch farms, and each farm has its own
+  // independent pull position. Using one global `since` per table would
+  // mean switching to a farm last modified before another farm's last pull
+  // silently skips that farm's older rows forever.
+  const key = `${table}:${farmId}`;
+  const meta = await db.sync_meta.get(key);
   const since = meta?.lastPulledAt ?? "1970-01-01T00:00:00.000Z";
 
   const { data, error } = await supabase
     .from(table)
     .select("*")
+    .eq("farm_id", farmId)
     .gt("updated_at", since)
     .order("updated_at", { ascending: true })
     .limit(500);
@@ -106,5 +138,5 @@ async function pullTable(table: SyncableTable) {
   await db.table(table).bulkPut(data.map((row) => ({ ...row, sync_status: "synced" as const })));
 
   const latest = data[data.length - 1] as { updated_at: string };
-  await db.sync_meta.put({ table, lastPulledAt: latest.updated_at });
+  await db.sync_meta.put({ key, lastPulledAt: latest.updated_at });
 }

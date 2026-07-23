@@ -17,11 +17,25 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import { Milk, PawPrint, Wheat, Stethoscope, Bell, Weight, Baby, Pill, AlertTriangle } from "lucide-react";
+import {
+  Milk,
+  PawPrint,
+  Wheat,
+  Stethoscope,
+  Bell,
+  Weight,
+  Baby,
+  Pill,
+  AlertTriangle,
+  Building2,
+  CloudUpload,
+  Syringe,
+} from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
+import { useSyncStatus } from "@/lib/sync/use-sync-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SPECIES_LABELS } from "@/lib/animal-labels";
 import { feedLabel } from "@/lib/feed-labels";
@@ -59,7 +73,7 @@ function StatCard({
 }
 
 export default function DashboardPage() {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const farmId = profile?.farm_id;
   const canSeeManagement = profile?.role === "owner" || profile?.role === "consultant";
 
@@ -67,6 +81,18 @@ export default function DashboardPage() {
   const [feedConsumption, setFeedConsumption] = useState<FeedConsumptionLog[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [insights, setInsights] = useState<AiInsight[]>([]);
+  const [totalFarms, setTotalFarms] = useState<number | null>(null);
+  const { pendingCount } = useSyncStatus();
+  const isOwner = profile?.role === "owner";
+
+  useEffect(() => {
+    if (!isOwner || !session?.user.id) return;
+    supabase
+      .from("farm_members")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", session.user.id)
+      .then(({ count }) => setTotalFarms(count ?? 1));
+  }, [isOwner, session?.user.id]);
 
   useEffect(() => {
     if (!farmId || !canSeeManagement) return;
@@ -180,6 +206,24 @@ export default function DashboardPage() {
     return entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 5);
   }, [farmId]);
 
+  const birthsThisMonth = useLiveQuery(async () => {
+    if (!farmId) return 0;
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const rows = await db.birth_records.where("farm_id").equals(farmId).toArray();
+    return rows
+      .filter((r) => !r.deleted_at && r.birth_date.slice(0, 7) === monthKey)
+      .reduce((sum, r) => sum + r.male_offspring_count + r.female_offspring_count, 0);
+  }, [farmId]);
+
+  const vaccinationsDue = useLiveQuery(async () => {
+    if (!farmId) return 0;
+    const in30Days = new Date();
+    in30Days.setDate(in30Days.getDate() + 30);
+    const cutoff = in30Days.toISOString().slice(0, 10);
+    const rows = await db.vaccinations.where("farm_id").equals(farmId).toArray();
+    return rows.filter((r) => !r.deleted_at && r.next_due_date && r.next_due_date <= cutoff).length;
+  }, [farmId]);
+
   const birthTrend = useLiveQuery(async () => {
     if (!farmId) return [];
     const rows = await db.birth_records.where("farm_id").equals(farmId).toArray();
@@ -254,6 +298,9 @@ export default function DashboardPage() {
       <h1 className="text-xl font-bold">داشبورد</h1>
 
       <div className="flex gap-3 overflow-x-auto pb-1">
+        {isOwner && totalFarms !== null && (
+          <StatCard icon={Building2} label="مزرعه‌ها" value={toPersianDigits(totalFarms)} />
+        )}
         <StatCard icon={PawPrint} label="کل دام‌ها" value={toPersianDigits(animals?.length ?? 0)} />
         <StatCard icon={Milk} label="شیر امروز (لیتر)" value={toPersianDigits((todayMilk ?? 0).toFixed(1))} />
         {canSeeManagement && (
@@ -264,6 +311,11 @@ export default function DashboardPage() {
           />
         )}
         <StatCard icon={Stethoscope} label="بیماری (۳۰ روز اخیر)" value={toPersianDigits(activeDiseaseCount ?? 0)} />
+        <StatCard icon={Baby} label="زایمان این ماه" value={toPersianDigits(birthsThisMonth ?? 0)} />
+        <StatCard icon={Syringe} label="واکسن‌های سررسید" value={toPersianDigits(vaccinationsDue ?? 0)} />
+        {pendingCount > 0 && (
+          <StatCard icon={CloudUpload} label="در انتظار همگام‌سازی" value={toPersianDigits(pendingCount)} />
+        )}
         {canSeeManagement && (
           <StatCard icon={Bell} label="هشدارها" value={toPersianDigits(notifications.length)} />
         )}
