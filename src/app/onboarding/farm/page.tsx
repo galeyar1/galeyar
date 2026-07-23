@@ -54,13 +54,19 @@ export default function CreateFarmPage() {
 
     setSubmitting(true);
 
-    const { data: farm, error: farmError } = await supabase
-      .from("farms")
-      .insert({ farm_name: values.farm_name, province: values.province, city: values.city })
-      .select()
-      .single();
+    // Generated client-side and inserted without .select(): right after this
+    // insert, current_farm_id() (used by farms_select_own's RLS policy) is
+    // still null — the user hasn't been attached to a farm yet — so asking
+    // PostgREST to return the row via RETURNING fails the SELECT policy on
+    // it and the whole insert rolls back. Not needing the row back sidesteps
+    // that chicken-and-egg problem entirely.
+    const farmId = crypto.randomUUID();
 
-    if (farmError || !farm) {
+    const { error: farmError } = await supabase
+      .from("farms")
+      .insert({ id: farmId, farm_name: values.farm_name, province: values.province, city: values.city });
+
+    if (farmError) {
       setSubmitting(false);
       toast.error("ثبت مزرعه ناموفق بود. دوباره تلاش کنید.");
       return;
@@ -68,7 +74,7 @@ export default function CreateFarmPage() {
 
     const { error: userError } = await supabase
       .from("users")
-      .update({ farm_id: farm.id })
+      .update({ farm_id: farmId })
       .eq("id", session.user.id);
 
     setSubmitting(false);
