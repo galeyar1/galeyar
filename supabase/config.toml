@@ -30,7 +30,7 @@ enable_confirmations = true
 # deploy with — Auth Hook config syntax has changed across CLI releases.
 [auth.hook.send_sms]
 enabled = true
-uri = "https://<project-ref>.supabase.co/functions/v1/send-sms-hook"
+uri = "https://abjevzhjnvpunjyivbky.supabase.co/functions/v1/send-sms-hook"
 secrets = "env(SEND_SMS_HOOK_SECRET)"
 
 [storage]
