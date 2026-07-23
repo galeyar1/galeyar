@@ -115,8 +115,10 @@ export default function SettingsPage() {
             <Input value={fullName} onChange={(e) => setFullName(e.target.value)} className="h-12 text-lg" />
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm text-muted-foreground">شماره موبایل</label>
-            <Input value={profile?.phone_number ?? ""} disabled className="h-12 text-lg" />
+            <label className="text-sm text-muted-foreground">
+              {profile?.phone_number ? "شماره موبایل" : "ایمیل"}
+            </label>
+            <Input value={profile?.phone_number ?? profile?.email ?? ""} disabled className="h-12 text-lg" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">نقش:</span>
@@ -181,7 +183,7 @@ export default function SettingsPage() {
             <ul className="flex flex-col gap-2">
               {members.map((m) => (
                 <li key={m.id} className="flex items-center justify-between rounded-lg bg-muted p-3">
-                  <span>{m.full_name || m.phone_number}</span>
+                  <span>{m.full_name || m.phone_number || m.email}</span>
                   <Badge variant="secondary">{ROLE_LABELS[m.role]}</Badge>
                 </li>
               ))}

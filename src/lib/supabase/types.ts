@@ -23,7 +23,8 @@ export interface Farm {
 export interface UserProfile {
   id: string;
   full_name: string | null;
-  phone_number: string;
+  phone_number: string | null;
+  email: string | null;
   role: UserRole;
   farm_id: string | null;
   created_at: string;
