@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { DeleteIconButton } from "@/components/confirm-dialog";
 import { softDeleteRecord } from "@/lib/sync/repository";
-import { SPECIES_LABELS, ANIMAL_STATUS_LABELS, animalTypeLabel, ageInYears } from "@/lib/animal-labels";
+import { SPECIES_LABELS, ANIMAL_STATUS_LABELS, effectiveAnimalTypeLabel, ageInYears } from "@/lib/animal-labels";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
 import type { Local } from "@/lib/db/schema";
 import type { Species, AnimalStatus, Animal } from "@/lib/supabase/types";
@@ -64,10 +64,25 @@ export default function AnimalsPage() {
     [animals]
   );
 
+  const earTagOf = useMemo(() => new Map((animals ?? []).map((a) => [a.id, a.ear_tag])), [animals]);
+
   const filtered = useMemo(() => {
     const q = query.trim();
     return (animals ?? []).filter((a) => {
-      if (q && !a.ear_tag.includes(q) && !(a.name ?? "").includes(q) && !a.id.includes(q)) return false;
+      if (q) {
+        const fatherTag = a.father_id ? earTagOf.get(a.father_id) ?? "" : "";
+        const motherTag = a.mother_id ? earTagOf.get(a.mother_id) ?? "" : "";
+        const haystack = [
+          a.ear_tag,
+          a.name ?? "",
+          a.id,
+          a.breed ?? "",
+          SPECIES_LABELS[a.species],
+          fatherTag,
+          motherTag,
+        ].join(" ");
+        if (!haystack.includes(q)) return false;
+      }
       if (speciesFilter !== "all" && a.species !== speciesFilter) return false;
       if (genderFilter !== "all" && a.gender !== genderFilter) return false;
       if (breedFilter !== "all" && a.breed !== breedFilter) return false;
@@ -75,7 +90,7 @@ export default function AnimalsPage() {
       if (!matchesAge(ageFilter, ageInYears(a.birth_date))) return false;
       return true;
     });
-  }, [animals, query, speciesFilter, genderFilter, breedFilter, statusFilter, ageFilter]);
+  }, [animals, query, earTagOf, speciesFilter, genderFilter, breedFilter, statusFilter, ageFilter]);
 
   const summary = useMemo(() => {
     const counts: Record<string, number> = { total: (animals ?? []).length };
@@ -130,7 +145,7 @@ export default function AnimalsPage() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="جستجو با پلاک، نام یا شناسه…"
+            placeholder="جستجو با پلاک، نام، نژاد، گونه، پدر یا مادر…"
             className="h-11 pr-9"
           />
         </div>
@@ -223,7 +238,7 @@ export default function AnimalsPage() {
                           {animal.ear_tag}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          {animalTypeLabel(animal.animal_type) ?? SPECIES_LABELS[animal.species]}
+                          {effectiveAnimalTypeLabel(animal.species, animal.gender, animal.birth_date, animal.animal_type)}
                           {animal.birth_date ? ` · متولد ${formatJalali(animal.birth_date)}` : ""}
                         </span>
                       </Link>

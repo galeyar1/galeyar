@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  PawPrint,
   ClipboardPlus,
   History,
   BarChart3,
@@ -22,15 +21,16 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { FarmSwitcher } from "@/components/farm-switcher";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
+import { AnimalNavIcon } from "@/components/animal-nav-icon";
 import type { UserRole } from "@/lib/supabase/types";
 
-type NavItem = { href: string; label: string; icon: typeof LayoutDashboard };
+type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
 /** Bottom nav is role-scoped per the spec's separate Manager/Operator/Vet/Consultant navigation. */
 const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   owner: [
     { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
-    { href: "/animals", label: "دام‌ها", icon: PawPrint },
+    { href: "/animals", label: "دام‌ها", icon: AnimalNavIcon },
     { href: "/register", label: "ثبت", icon: ClipboardPlus },
     { href: "/feed", label: "خوراک", icon: Wheat },
     { href: "/reports", label: "گزارش", icon: BarChart3 },
@@ -42,7 +42,7 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
     { href: "/history", label: "تاریخچه", icon: History },
   ],
   vet: [
-    { href: "/animals", label: "دام‌ها", icon: PawPrint },
+    { href: "/animals", label: "دام‌ها", icon: AnimalNavIcon },
     { href: "/register", label: "ثبت درمان", icon: ClipboardPlus },
     { href: "/history", label: "تاریخچه", icon: History },
   ],

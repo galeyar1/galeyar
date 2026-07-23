@@ -12,6 +12,7 @@ import { triggerSync } from "@/lib/sync/engine";
 import { canSwitchToFarm, type FarmMembershipLike } from "@/lib/farm-access";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DeleteIconButton } from "@/components/confirm-dialog";
 import type { Farm } from "@/lib/supabase/types";
 
 export default function FarmsPage() {
@@ -64,6 +65,16 @@ export default function FarmsPage() {
     router.push("/dashboard");
   }
 
+  async function deleteFarm(farmId: string) {
+    const { error } = await supabase.from("farms").delete().eq("id", farmId);
+    if (error) {
+      toast.error(`حذف مزرعه ناموفق بود: ${error.message}`);
+      return;
+    }
+    toast.success("مزرعه حذف شد");
+    void loadFarms();
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
@@ -103,14 +114,23 @@ export default function FarmsPage() {
                     </span>
                   ) : (
                     isOwner && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => switchTo(farm.id)}
-                        disabled={switching === farm.id}
-                      >
-                        {switching === farm.id ? "در حال سوییچ…" : "سوییچ"}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => switchTo(farm.id)}
+                          disabled={switching === farm.id}
+                        >
+                          {switching === farm.id ? "در حال سوییچ…" : "سوییچ"}
+                        </Button>
+                        {farms.length > 1 && (
+                          <DeleteIconButton
+                            title="حذف مزرعه"
+                            description={`آیا از حذف «${farm.farm_name}» مطمئن هستید؟ همه داده‌های این مزرعه (دام‌ها، گزارش‌ها) و دسترسی هر عضو تیمی که فقط به این مزرعه وصل است، برای همیشه حذف می‌شود.`}
+                            onDelete={() => deleteFarm(farm.id)}
+                          />
+                        )}
+                      </div>
                     )
                   )}
                 </CardContent>

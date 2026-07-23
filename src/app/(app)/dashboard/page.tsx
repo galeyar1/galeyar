@@ -19,7 +19,6 @@ import {
 } from "recharts";
 import {
   Milk,
-  PawPrint,
   Wheat,
   Stethoscope,
   Bell,
@@ -37,7 +36,8 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { useSyncStatus } from "@/lib/sync/use-sync-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SPECIES_LABELS } from "@/lib/animal-labels";
+import { AnimalNavIcon } from "@/components/animal-nav-icon";
+import { SPECIES_LABELS, effectiveAnimalType, portfolioColor } from "@/lib/animal-labels";
 import { feedLabel } from "@/lib/feed-labels";
 import { todayIso, toPersianDigits } from "@/lib/jalali";
 import type {
@@ -46,7 +46,10 @@ import type {
   FeedConsumptionLog,
   FeedType,
   NotificationRow,
+  Species,
 } from "@/lib/supabase/types";
+
+const SPECIES_ORDER: Species[] = ["sheep", "goat", "cattle", "camel", "horse"];
 
 const CONSUMPTION_WINDOW_DAYS = 30;
 
@@ -57,7 +60,7 @@ function StatCard({
   label,
   value,
 }: {
-  icon: typeof Milk;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
 }) {
@@ -273,6 +276,30 @@ export default function DashboardPage() {
     value: count,
   }));
 
+  const portfolioBySpecies = SPECIES_ORDER.map((species) => {
+    const speciesAnimals = (animals ?? []).filter((a) => a.species === species);
+    if (speciesAnimals.length === 0) return null;
+
+    const buckets = new Map<string, { label: string; count: number; color: string }>();
+    for (const a of speciesAnimals) {
+      const type = effectiveAnimalType(species, a.gender as "male" | "female" | null, a.birth_date);
+      if (!type) continue;
+      const key = type.value;
+      const existing = buckets.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        buckets.set(key, { label: type.label, count: 1, color: portfolioColor(species, type.gender, type.isJuvenile) });
+      }
+    }
+
+    return {
+      species,
+      total: speciesAnimals.length,
+      entries: [...buckets.values()],
+    };
+  }).filter((p): p is NonNullable<typeof p> => p !== null);
+
   const feedConsumptionChartData = feedInventory.map((item) => ({
     name: feedLabel(item),
     value: feedConsumption
@@ -301,7 +328,7 @@ export default function DashboardPage() {
         {isOwner && totalFarms !== null && (
           <StatCard icon={Building2} label="مزرعه‌ها" value={toPersianDigits(totalFarms)} />
         )}
-        <StatCard icon={PawPrint} label="کل دام‌ها" value={toPersianDigits(animals?.length ?? 0)} />
+        <StatCard icon={AnimalNavIcon} label="کل دام‌ها" value={toPersianDigits(animals?.length ?? 0)} />
         <StatCard icon={Milk} label="شیر امروز (لیتر)" value={toPersianDigits((todayMilk ?? 0).toFixed(1))} />
         {canSeeManagement && (
           <StatCard
@@ -345,6 +372,43 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {portfolioBySpecies.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>پرتفوی دام‌ها</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            {portfolioBySpecies.map(({ species, total, entries }) => (
+              <div key={species} className="flex items-center gap-4">
+                <ResponsiveContainer width={90} height={90} className="shrink-0">
+                  <PieChart>
+                    <Pie data={entries} dataKey="count" nameKey="label" innerRadius={22} outerRadius={40}>
+                      {entries.map((e) => (
+                        <Cell key={e.label} fill={e.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-1 flex-col gap-0.5">
+                  <span className="font-semibold">
+                    {SPECIES_LABELS[species]} ({toPersianDigits(total)})
+                  </span>
+                  <ul className="flex flex-col text-sm text-muted-foreground">
+                    {entries.map((e) => (
+                      <li key={e.label} className="flex items-center gap-1.5">
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
+                        {toPersianDigits(e.count)} {e.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {canSeeManagement && (
         <Card>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search, Ban } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { Input } from "@/components/ui/input";
@@ -21,10 +21,12 @@ interface AnimalPickerProps {
   onChange: (animalId: string) => void;
   filter?: "all" | "female" | "male";
   className?: string;
+  /** Adds an explicit "هیچکدام" option — e.g. unknown father, AI, external sire. */
+  allowNone?: boolean;
 }
 
 /** Full-screen searchable picker — a dropdown is too fiddly one-handed for a long ear-tag list. */
-export function AnimalPicker({ farmId, value, onChange, filter = "all", className }: AnimalPickerProps) {
+export function AnimalPicker({ farmId, value, onChange, filter = "all", className, allowNone = false }: AnimalPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -45,6 +47,8 @@ export function AnimalPicker({ farmId, value, onChange, filter = "all", classNam
     return a.ear_tag.includes(q) || (a.name ?? "").includes(q);
   });
 
+  const showingNone = allowNone && !value;
+
   return (
     <>
       <button
@@ -56,7 +60,11 @@ export function AnimalPicker({ farmId, value, onChange, filter = "all", classNam
         )}
       >
         <span className={cn(!selected && "text-muted-foreground")}>
-          {selected ? `${selected.ear_tag}${selected.name ? ` — ${selected.name}` : ""}` : "انتخاب دام"}
+          {selected
+            ? `${selected.ear_tag}${selected.name ? ` — ${selected.name}` : ""}`
+            : showingNone
+              ? "هیچکدام"
+              : "انتخاب دام"}
         </span>
         <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
       </button>
@@ -78,6 +86,26 @@ export function AnimalPicker({ farmId, value, onChange, filter = "all", classNam
               />
             </div>
             <ul className="flex flex-col gap-2 overflow-y-auto">
+              {allowNone && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange("");
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-xl border border-dashed border-border p-3 text-start text-muted-foreground",
+                      !value && "border-primary bg-primary/5 text-foreground"
+                    )}
+                  >
+                    <Ban className="size-4 shrink-0" />
+                    <span className="text-lg font-semibold">هیچکدام</span>
+                    <span className="text-sm">(پدر نامشخص / تلقیح مصنوعی / دام خارجی)</span>
+                  </button>
+                </li>
+              )}
               {filtered.map((animal) => (
                 <li key={animal.id}>
                   <button

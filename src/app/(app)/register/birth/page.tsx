@@ -14,7 +14,7 @@ import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { todayIso, toPersianDigits } from "@/lib/jalali";
-import { BIRTH_OFFSPRING_TYPE } from "@/lib/animal-labels";
+import { juvenileAnimalType } from "@/lib/animal-labels";
 
 function BirthForm({ recordId }: { recordId: string | null }) {
   const router = useRouter();
@@ -71,7 +71,8 @@ function BirthForm({ recordId }: { recordId: string | null }) {
     // Auto-create one animal record per offspring, tagged provisionally —
     // the farmer renames the ear tag later once they actually tag the animal.
     if (mother) {
-      const offspringType = BIRTH_OFFSPRING_TYPE[mother.species];
+      const maleType = juvenileAnimalType(mother.species, "male");
+      const femaleType = juvenileAnimalType(mother.species, "female");
       const jobs: Promise<unknown>[] = [];
       for (let i = 0; i < (Number(maleCount) || 0); i++) {
         jobs.push(
@@ -79,7 +80,7 @@ function BirthForm({ recordId }: { recordId: string | null }) {
             ear_tag: `${mother.ear_tag}-${crypto.randomUUID().slice(0, 6)}`,
             name: null,
             species: mother.species,
-            animal_type: offspringType.male,
+            animal_type: maleType.value,
             breed: mother.breed,
             gender: "male",
             birth_date: birthDate,
@@ -96,7 +97,7 @@ function BirthForm({ recordId }: { recordId: string | null }) {
             ear_tag: `${mother.ear_tag}-${crypto.randomUUID().slice(0, 6)}`,
             name: null,
             species: mother.species,
-            animal_type: offspringType.female,
+            animal_type: femaleType.value,
             breed: mother.breed,
             gender: "female",
             birth_date: birthDate,
@@ -126,7 +127,7 @@ function BirthForm({ recordId }: { recordId: string | null }) {
 
       <div className="flex flex-col gap-2">
         <label className="text-base">پدر (اختیاری)</label>
-        <AnimalPicker farmId={profile?.farm_id} value={fatherId} onChange={setFatherId} filter="male" />
+        <AnimalPicker farmId={profile?.farm_id} value={fatherId} onChange={setFatherId} filter="male" allowNone />
       </div>
 
       <div className="flex flex-col gap-2">

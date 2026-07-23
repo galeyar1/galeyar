@@ -30,7 +30,7 @@ import {
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
-import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS } from "@/lib/animal-labels";
+import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS, breedOptionsFor, DEFAULT_BREED } from "@/lib/animal-labels";
 import type { Species } from "@/lib/supabase/types";
 
 const SPECIES_OPTIONS = Object.keys(SPECIES_LABELS) as Species[];
@@ -52,7 +52,7 @@ const EMPTY_VALUES: FormValues = {
   name: "",
   species: "sheep",
   animal_type: "",
-  breed: "",
+  breed: DEFAULT_BREED,
   birth_date: "",
   notes: "",
 };
@@ -89,6 +89,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
 
   const species = form.watch("species");
   const typeOptions = ANIMAL_TYPES_BY_SPECIES[species];
+  const breedOptions = breedOptionsFor(species);
 
   async function onSubmit(values: FormValues) {
     if (!profile?.farm_id || !session) return;
@@ -155,6 +156,8 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
                   onValueChange={(value) => {
                     field.onChange(value);
                     form.setValue("animal_type", "");
+                    const options = breedOptionsFor(value as Species);
+                    form.setValue("breed", options ? DEFAULT_BREED : "");
                   }}
                   value={field.value}
                 >
@@ -217,9 +220,24 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
             name="breed"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-base">نژاد (اختیاری)</FormLabel>
+                <FormLabel className="text-base">نژاد{breedOptions ? "" : " (اختیاری)"}</FormLabel>
                 <FormControl>
-                  <Input {...field} className="h-12 text-lg" />
+                  {breedOptions ? (
+                    <Select onValueChange={field.onChange} value={field.value || DEFAULT_BREED}>
+                      <SelectTrigger className="h-12 w-full text-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {breedOptions.map((b) => (
+                          <SelectItem key={b} value={b}>
+                            {b}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input {...field} className="h-12 text-lg" />
+                  )}
                 </FormControl>
               </FormItem>
             )}

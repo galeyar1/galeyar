@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Milk, Weight, Stethoscope, Baby, Pill, PawPrint, Syringe } from "lucide-react";
+import { Milk, Weight, Stethoscope, Baby, Pill, Syringe } from "lucide-react";
+import { AnimalNavIcon } from "@/components/animal-nav-icon";
 
-const ITEMS = [
+const ITEMS: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
   { href: "/register/milk", label: "ثبت شیر", icon: Milk, color: "text-primary" },
   { href: "/register/weight", label: "ثبت وزن", icon: Weight, color: "text-primary" },
   { href: "/register/disease", label: "ثبت بیماری", icon: Stethoscope, color: "text-destructive" },
   { href: "/register/birth", label: "ثبت زایمان", icon: Baby, color: "text-success" },
   { href: "/register/treatment", label: "ثبت درمان", icon: Pill, color: "text-success" },
   { href: "/register/vaccination", label: "ثبت واکسیناسیون", icon: Syringe, color: "text-success" },
-  { href: "/animals/new", label: "ثبت دام جدید", icon: PawPrint, color: "text-primary" },
+  { href: "/animals/new", label: "ثبت دام جدید", icon: AnimalNavIcon, color: "text-primary" },
 ];
 
 export default function RegisterHubPage() {

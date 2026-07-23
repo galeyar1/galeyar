@@ -26,7 +26,7 @@ import { softDeleteRecord } from "@/lib/sync/repository";
 import {
   SPECIES_LABELS,
   ANIMAL_STATUS_LABELS,
-  animalTypeLabel,
+  effectiveAnimalTypeLabel,
   ageLabel,
 } from "@/lib/animal-labels";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
@@ -241,7 +241,10 @@ function AnimalDetail({ animalId }: { animalId: string }) {
           <InfoRow label="شناسه داخلی" value={animal.id.slice(0, 8)} />
           <InfoRow label="نام" value={animal.name ?? "—"} />
           <InfoRow label="گونه" value={SPECIES_LABELS[animal.species]} />
-          <InfoRow label="نوع" value={animalTypeLabel(animal.animal_type) ?? "—"} />
+          <InfoRow
+            label="نوع"
+            value={effectiveAnimalTypeLabel(animal.species, animal.gender, animal.birth_date, animal.animal_type)}
+          />
           <InfoRow label="نژاد" value={animal.breed ?? "—"} />
           <InfoRow label="جنسیت" value={animal.gender === "male" ? "نر" : animal.gender === "female" ? "ماده" : "—"} />
           <InfoRow label="تاریخ تولد" value={animal.birth_date ? formatJalali(animal.birth_date) : "—"} />

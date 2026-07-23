@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ResponsiveContainer,
@@ -16,6 +17,13 @@ import {
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toPersianDigits } from "@/lib/jalali";
 
 const DISEASE_LABELS: Record<string, string> = {
@@ -25,6 +33,22 @@ const DISEASE_LABELS: Record<string, string> = {
   infectious: "عفونی",
   lameness: "لنگش",
   other: "سایر",
+};
+
+type MilkPeriod = "daily" | "weekly" | "monthly" | "yearly";
+
+const MILK_PERIOD_DAYS: Record<MilkPeriod, number> = {
+  daily: 1,
+  weekly: 7,
+  monthly: 30,
+  yearly: 365,
+};
+
+const MILK_PERIOD_LABELS: Record<MilkPeriod, string> = {
+  daily: "روزانه",
+  weekly: "هفتگی",
+  monthly: "ماهانه",
+  yearly: "سالانه",
 };
 
 function lastNDays(n: number): string[] {
@@ -40,6 +64,26 @@ function lastNDays(n: number): string[] {
 export default function ReportsPage() {
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
+  const [milkPeriod, setMilkPeriod] = useState<MilkPeriod>("monthly");
+
+  const avgMilkProduction = useLiveQuery(async () => {
+    if (!farmId) return null;
+    const days = MILK_PERIOD_DAYS[milkPeriod];
+    const since = new Date();
+    since.setDate(since.getDate() - days + 1);
+    const sinceIso = since.toISOString().slice(0, 10);
+
+    const rows = await db.milk_records.where("farm_id").equals(farmId).toArray();
+    const inPeriod = rows.filter((r) => !r.deleted_at && r.record_date >= sinceIso);
+    const total = inPeriod.reduce((sum, r) => sum + Number(r.morning_milk ?? 0) + Number(r.evening_milk ?? 0), 0);
+    const lactatingAnimals = new Set(inPeriod.map((r) => r.animal_id)).size;
+
+    return {
+      total,
+      lactatingAnimals,
+      average: lactatingAnimals > 0 ? total / lactatingAnimals : 0,
+    };
+  }, [farmId, milkPeriod]);
 
   const milkTrend = useLiveQuery(async () => {
     if (!farmId) return [];
@@ -91,6 +135,35 @@ export default function ReportsPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <h1 className="text-xl font-bold">گزارش‌ها و تحلیل</h1>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>میانگین تولید شیر</CardTitle>
+          <Select value={milkPeriod} onValueChange={(v) => setMilkPeriod(v as MilkPeriod)}>
+            <SelectTrigger className="h-9 w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(Object.keys(MILK_PERIOD_LABELS) as MilkPeriod[]).map((p) => (
+                <SelectItem key={p} value={p}>{MILK_PERIOD_LABELS[p]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardHeader>
+        <CardContent>
+          {avgMilkProduction && avgMilkProduction.lactatingAnimals > 0 ? (
+            <div className="flex flex-col gap-1">
+              <span className="text-3xl font-bold text-primary">
+                {toPersianDigits(avgMilkProduction.average.toFixed(1))} لیتر
+              </span>
+              <span className="text-sm text-muted-foreground">
+                به ازای هر دام شیرده — از مجموع {toPersianDigits(avgMilkProduction.total.toFixed(1))} لیتر بین{" "}
+                {toPersianDigits(avgMilkProduction.lactatingAnimals)} دام ({MILK_PERIOD_LABELS[milkPeriod]})
+              </span>
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground">داده کافی برای این بازه زمانی وجود ندارد.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

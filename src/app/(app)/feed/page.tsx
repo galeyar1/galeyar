@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Minus, Pencil, Wheat } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
@@ -31,6 +32,7 @@ import type { FeedInventory, FeedConsumptionLog, FeedType, FeedUnit } from "@/li
 const FEED_TYPES = Object.keys(FEED_TYPE_LABELS) as FeedType[];
 const FEED_UNITS = Object.keys(FEED_UNIT_LABELS) as FeedUnit[];
 const CONSUMPTION_WINDOW_DAYS = 30;
+const PORTFOLIO_COLORS = ["#1B5E20", "#66BB6A", "#EF6C00", "#8D6E63", "#5D4037", "#A5D6A7", "#78909C"];
 
 interface EditState {
   id: string;
@@ -38,6 +40,60 @@ interface EditState {
   unit: FeedUnit;
   unitCost: string;
   customLabel: string;
+}
+
+/**
+ * Quantity/percentage per feed type. Note: percentage mixes units
+ * (kg/ton/bag) as raw numbers — meaningful when a farm keeps one unit per
+ * type consistently, approximate otherwise. No unit-conversion table exists
+ * to normalize this properly.
+ */
+function FeedPortfolioChart({ inventory }: { inventory: FeedInventory[] }) {
+  const data = useMemo(() => {
+    const total = inventory.reduce((sum, i) => sum + Number(i.quantity), 0);
+    return inventory.map((item, index) => ({
+      name: feedLabel(item),
+      value: Number(item.quantity),
+      unit: FEED_UNIT_LABELS[item.unit],
+      percent: total > 0 ? (Number(item.quantity) / total) * 100 : 0,
+      color: PORTFOLIO_COLORS[index % PORTFOLIO_COLORS.length],
+    }));
+  }, [inventory]);
+
+  if (data.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>پرتفوی خوراک</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <ResponsiveContainer width="100%" height={180} className="sm:max-w-[180px]">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius={40} outerRadius={80}>
+              {data.map((d) => (
+                <Cell key={d.name} fill={d.color} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(v, _n, item) => `${toPersianDigits(Number(v))} ${item.payload.unit}`} />
+          </PieChart>
+        </ResponsiveContainer>
+        <ul className="flex flex-1 flex-col gap-1.5 text-sm">
+          {data.map((d) => (
+            <li key={d.name} className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
+                {d.name}
+              </span>
+              <span className="text-muted-foreground">
+                {toPersianDigits(d.value)} {d.unit} · {toPersianDigits(d.percent.toFixed(0))}٪
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function FeedManagementPage() {
@@ -174,6 +230,7 @@ export default function FeedManagementPage() {
     return (
       <div className="flex flex-col gap-4 p-4">
         <h1 className="text-xl font-bold">مدیریت خوراک</h1>
+        <FeedPortfolioChart inventory={inventory} />
         {loading ? null : inventory.length === 0 ? (
           <p className="text-center text-muted-foreground">موجودی خوراکی ثبت نشده است.</p>
         ) : (
@@ -195,6 +252,8 @@ export default function FeedManagementPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <h1 className="text-xl font-bold">مدیریت خوراک</h1>
+
+      <FeedPortfolioChart inventory={inventory} />
 
       <ul className="flex flex-col gap-3">
         {inventory.map((item) => {
