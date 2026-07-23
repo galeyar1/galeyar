@@ -43,28 +43,30 @@ export default function AnimalsPage() {
 
       <ul className="flex flex-col gap-2">
         {animals?.map((animal) => (
-          <li
-            key={animal.id}
-            className="flex items-center justify-between rounded-xl border border-border bg-card p-4"
-          >
-            <div className="flex flex-col gap-1">
-              <span className="text-lg font-semibold">
-                {animal.name ? `${animal.name} — ` : ""}
-                {animal.ear_tag}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {SPECIES_LABELS[animal.species]}
-                {animal.birth_date ? ` · متولد ${formatJalali(animal.birth_date)}` : ""}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {animal.sync_status === "pending" && (
-                <Clock className="size-4 text-warning" aria-label="در انتظار همگام‌سازی" />
-              )}
-              <Badge variant={animal.status === "active" ? "default" : "secondary"}>
-                {ANIMAL_STATUS_LABELS[animal.status]}
-              </Badge>
-            </div>
+          <li key={animal.id}>
+            <Link
+              href={`/animals/view?id=${animal.id}`}
+              className="flex items-center justify-between rounded-xl border border-border bg-card p-4"
+            >
+              <div className="flex flex-col gap-1">
+                <span className="text-lg font-semibold">
+                  {animal.name ? `${animal.name} — ` : ""}
+                  {animal.ear_tag}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {SPECIES_LABELS[animal.species]}
+                  {animal.birth_date ? ` · متولد ${formatJalali(animal.birth_date)}` : ""}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {animal.sync_status === "pending" && (
+                  <Clock className="size-4 text-warning" aria-label="در انتظار همگام‌سازی" />
+                )}
+                <Badge variant={animal.status === "active" ? "default" : "secondary"}>
+                  {ANIMAL_STATUS_LABELS[animal.status]}
+                </Badge>
+              </div>
+            </Link>
           </li>
         ))}
       </ul>

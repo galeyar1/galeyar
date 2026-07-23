@@ -49,17 +49,37 @@ create trigger set_updated_at before update on public.feed_inventory
   for each row execute function public.set_updated_at();
 
 -- Every auth.users row (created by the send-otp/verify-otp edge functions)
--- gets a matching public.users profile row automatically.
+-- gets a matching public.users profile row automatically. If the phone
+-- number has a pending invite (owner used the "add team member" screen
+-- before this person ever signed up), join them straight into that farm
+-- with the invited role instead of making them an owner of nothing.
 create or replace function public.handle_new_auth_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  invite public.farm_invites%rowtype;
 begin
-  insert into public.users (id, phone_number, role, farm_id)
-  values (new.id, new.phone, 'owner', null)
-  on conflict (id) do nothing;
+  select * into invite
+    from public.farm_invites
+    where phone_number = new.phone and accepted_at is null
+    order by created_at desc
+    limit 1;
+
+  if invite.id is not null then
+    insert into public.users (id, phone_number, role, farm_id)
+    values (new.id, new.phone, invite.role, invite.farm_id)
+    on conflict (id) do nothing;
+
+    update public.farm_invites set accepted_at = now() where id = invite.id;
+  else
+    insert into public.users (id, phone_number, role, farm_id)
+    values (new.id, new.phone, 'owner', null)
+    on conflict (id) do nothing;
+  end if;
+
   return new;
 end;
 $$;

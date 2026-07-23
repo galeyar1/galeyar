@@ -3,16 +3,54 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, PawPrint, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  PawPrint,
+  ClipboardPlus,
+  History,
+  BarChart3,
+  Sparkles,
+  Settings,
+  Home as HomeIcon,
+} from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import type { UserRole } from "@/lib/supabase/types";
+
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard };
+
+/** Bottom nav is role-scoped per the spec's separate Manager/Operator/Vet/Consultant navigation. */
+const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
+  owner: [
+    { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+    { href: "/animals", label: "دام‌ها", icon: PawPrint },
+    { href: "/register", label: "ثبت", icon: ClipboardPlus },
+    { href: "/reports", label: "گزارش", icon: BarChart3 },
+    { href: "/ai", label: "دستیار", icon: Sparkles },
+  ],
+  operator: [
+    { href: "/home", label: "خانه", icon: HomeIcon },
+    { href: "/register", label: "ثبت", icon: ClipboardPlus },
+    { href: "/history", label: "تاریخچه", icon: History },
+  ],
+  vet: [
+    { href: "/animals", label: "دام‌ها", icon: PawPrint },
+    { href: "/register", label: "ثبت درمان", icon: ClipboardPlus },
+    { href: "/history", label: "تاریخچه", icon: History },
+  ],
+  consultant: [
+    { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+    { href: "/reports", label: "گزارش", icon: BarChart3 },
+    { href: "/ai", label: "دستیار", icon: Sparkles },
+  ],
+};
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading } = useAuth();
 
   useEffect(() => {
     if (loading) return;
@@ -33,19 +71,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const canSeeDashboard = profile.role === "owner" || profile.role === "consultant";
-
-  const navItems = [
-    canSeeDashboard && { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
-    { href: "/animals", label: "دام‌ها", icon: PawPrint },
-  ].filter(Boolean) as { href: string; label: string; icon: typeof LayoutDashboard }[];
+  const navItems = NAV_BY_ROLE[profile.role];
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <span className="text-lg font-bold text-primary">گله‌یار</span>
-        <Button variant="ghost" size="icon" onClick={() => signOut().then(() => router.push("/auth/login"))}>
-          <LogOut className="size-5" />
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/settings">
+            <Settings className="size-5" />
+          </Link>
         </Button>
       </header>
 

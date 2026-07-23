@@ -1,27 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Milk, PawPrint, Wheat, Stethoscope, Bell } from "lucide-react";
+import { Milk, PawPrint, Wheat, Stethoscope, Bell, Weight, Baby, Pill } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SPECIES_LABELS } from "@/lib/animal-labels";
+import { FEED_TYPE_LABELS } from "@/lib/feed-labels";
 import { todayIso, toPersianDigits } from "@/lib/jalali";
 import type { AiInsight, FeedInventory, NotificationRow } from "@/lib/supabase/types";
 
 const CHART_COLORS = ["#1B5E20", "#66BB6A", "#A5D6A7", "#2E7D32"];
-
-const FEED_TYPE_LABELS: Record<string, string> = {
-  hay: "یونجه",
-  straw: "کاه",
-  flour: "آرد",
-  soybean: "سویا",
-  concentrate: "کنسانتره",
-};
 
 function StatCard({
   icon: Icon,
@@ -102,6 +96,59 @@ export default function DashboardPage() {
     return rows.filter((r) => !r.deleted_at && r.record_date >= since.toISOString().slice(0, 10)).length;
   }, [farmId]);
 
+  const recentActivity = useLiveQuery(async () => {
+    if (!farmId) return [];
+    const [animalRows, milk, weight, disease, births, treatments] = await Promise.all([
+      db.animals.where("farm_id").equals(farmId).toArray(),
+      db.milk_records.where("farm_id").equals(farmId).toArray(),
+      db.weight_records.where("farm_id").equals(farmId).toArray(),
+      db.disease_records.where("farm_id").equals(farmId).toArray(),
+      db.birth_records.where("farm_id").equals(farmId).toArray(),
+      db.treatments.where("farm_id").equals(farmId).toArray(),
+    ]);
+    const earTagOf = new Map(animalRows.map((a) => [a.id, a.ear_tag]));
+
+    const entries = [
+      ...milk.filter((r) => !r.deleted_at).map((r) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        icon: Milk,
+        color: "text-primary",
+        title: `ثبت شیر — ${earTagOf.get(r.animal_id) ?? "؟"}`,
+      })),
+      ...weight.filter((r) => !r.deleted_at).map((r) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        icon: Weight,
+        color: "text-primary",
+        title: `ثبت وزن — ${earTagOf.get(r.animal_id) ?? "؟"}`,
+      })),
+      ...disease.filter((r) => !r.deleted_at).map((r) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        icon: Stethoscope,
+        color: "text-destructive",
+        title: `بیماری — ${earTagOf.get(r.animal_id) ?? "؟"}`,
+      })),
+      ...births.filter((r) => !r.deleted_at).map((r) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        icon: Baby,
+        color: "text-success",
+        title: `زایمان — ${earTagOf.get(r.mother_id) ?? "؟"}`,
+      })),
+      ...treatments.filter((r) => !r.deleted_at).map((r) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        icon: Pill,
+        color: "text-success",
+        title: `درمان — ${earTagOf.get(r.animal_id) ?? "؟"}`,
+      })),
+    ];
+
+    return entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 5);
+  }, [farmId]);
+
   const herdComposition = (animals ?? []).reduce<Record<string, number>>((acc, a) => {
     acc[a.species] = (acc[a.species] ?? 0) + 1;
     return acc;
@@ -158,6 +205,29 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>فعالیت‌های اخیر</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentActivity && recentActivity.length > 0 ? (
+            <ul className="flex flex-col gap-2">
+              {recentActivity.map((entry) => (
+                <li key={entry.id} className="flex items-center gap-2 text-sm">
+                  <entry.icon className={`size-4 shrink-0 ${entry.color}`} />
+                  <span>{entry.title}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-center text-muted-foreground">هنوز فعالیتی ثبت نشده است.</p>
+          )}
+          <Link href="/history" className="mt-2 block text-center text-sm text-primary">
+            مشاهده همه فعالیت‌ها
+          </Link>
+        </CardContent>
+      </Card>
+
       {canSeeManagement && (
         <Card>
           <CardHeader>
@@ -169,7 +239,7 @@ export default function DashboardPage() {
                 {(feedForecast.payload as { feed_type: string; days_remaining: number | null }[]).map(
                   (f) => (
                     <li key={f.feed_type} className="flex justify-between text-sm">
-                      <span>{FEED_TYPE_LABELS[f.feed_type] ?? f.feed_type}</span>
+                      <span>{FEED_TYPE_LABELS[f.feed_type as keyof typeof FEED_TYPE_LABELS] ?? f.feed_type}</span>
                       <span className={f.days_remaining !== null && f.days_remaining <= 14 ? "text-destructive" : ""}>
                         {f.days_remaining !== null
                           ? `${toPersianDigits(f.days_remaining)} روز باقی‌مانده`
