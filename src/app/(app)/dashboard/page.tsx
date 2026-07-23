@@ -1,0 +1,256 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { Milk, PawPrint, Wheat, Stethoscope, Bell } from "lucide-react";
+
+import { db } from "@/lib/db/schema";
+import { useAuth } from "@/lib/auth/auth-provider";
+import { supabase } from "@/lib/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SPECIES_LABELS } from "@/lib/animal-labels";
+import { todayIso, toPersianDigits } from "@/lib/jalali";
+import type { AiInsight, FeedInventory, NotificationRow } from "@/lib/supabase/types";
+
+const CHART_COLORS = ["#1B5E20", "#66BB6A", "#A5D6A7", "#2E7D32"];
+
+const FEED_TYPE_LABELS: Record<string, string> = {
+  hay: "یونجه",
+  straw: "کاه",
+  flour: "آرد",
+  soybean: "سویا",
+  concentrate: "کنسانتره",
+};
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Milk;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Card className="min-w-[140px] flex-1">
+      <CardContent className="flex flex-col gap-1 p-4">
+        <Icon className="size-5 text-primary" />
+        <span className="text-2xl font-bold">{value}</span>
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function DashboardPage() {
+  const { profile } = useAuth();
+  const farmId = profile?.farm_id;
+  const canSeeManagement = profile?.role === "owner" || profile?.role === "consultant";
+
+  const [feedInventory, setFeedInventory] = useState<FeedInventory[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [insights, setInsights] = useState<AiInsight[]>([]);
+
+  useEffect(() => {
+    if (!farmId || !canSeeManagement) return;
+
+    supabase
+      .from("feed_inventory")
+      .select("*")
+      .eq("farm_id", farmId)
+      .then(({ data }) => setFeedInventory(data ?? []));
+
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("farm_id", farmId)
+      .eq("is_read", false)
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => setNotifications(data ?? []));
+
+    supabase
+      .from("ai_insights")
+      .select("*")
+      .eq("farm_id", farmId)
+      .order("generated_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => setInsights(data ?? []));
+  }, [farmId, canSeeManagement]);
+
+  const animals = useLiveQuery(async () => {
+    if (!farmId) return [];
+    const rows = await db.animals.where("farm_id").equals(farmId).toArray();
+    return rows.filter((a) => !a.deleted_at && a.status === "active");
+  }, [farmId]);
+
+  const todayMilk = useLiveQuery(async () => {
+    if (!farmId) return 0;
+    const today = todayIso();
+    const rows = await db.milk_records.where("farm_id").equals(farmId).toArray();
+    return rows
+      .filter((r) => !r.deleted_at && r.record_date === today)
+      .reduce((sum, r) => sum + Number(r.morning_milk ?? 0) + Number(r.evening_milk ?? 0), 0);
+  }, [farmId]);
+
+  const activeDiseaseCount = useLiveQuery(async () => {
+    if (!farmId) return 0;
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+    const rows = await db.disease_records.where("farm_id").equals(farmId).toArray();
+    return rows.filter((r) => !r.deleted_at && r.record_date >= since.toISOString().slice(0, 10)).length;
+  }, [farmId]);
+
+  const herdComposition = (animals ?? []).reduce<Record<string, number>>((acc, a) => {
+    acc[a.species] = (acc[a.species] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const chartData = Object.entries(herdComposition).map(([species, count]) => ({
+    name: SPECIES_LABELS[species as keyof typeof SPECIES_LABELS] ?? species,
+    value: count,
+  }));
+
+  const feedForecast = insights.find((i) => i.insight_type === "feed_forecast");
+  const herdGrowth = insights.find((i) => i.insight_type === "herd_growth");
+  const aiSuggestions = insights.filter((i) => i.insight_type !== "feed_forecast" && i.insight_type !== "herd_growth");
+
+  return (
+    <div className="flex flex-col gap-6 p-4">
+      <h1 className="text-xl font-bold">داشبورد</h1>
+
+      <div className="flex gap-3 overflow-x-auto pb-1">
+        <StatCard icon={PawPrint} label="کل دام‌ها" value={toPersianDigits(animals?.length ?? 0)} />
+        <StatCard icon={Milk} label="شیر امروز (لیتر)" value={toPersianDigits((todayMilk ?? 0).toFixed(1))} />
+        {canSeeManagement && (
+          <StatCard
+            icon={Wheat}
+            label="اقلام خوراک"
+            value={toPersianDigits(feedInventory.length)}
+          />
+        )}
+        <StatCard icon={Stethoscope} label="بیماری (۳۰ روز اخیر)" value={toPersianDigits(activeDiseaseCount ?? 0)} />
+        {canSeeManagement && (
+          <StatCard icon={Bell} label="هشدارها" value={toPersianDigits(notifications.length)} />
+        )}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>ترکیب گله</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={chartData} dataKey="value" nameKey="name" outerRadius={80} label>
+                  {chartData.map((_, index) => (
+                    <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-center text-muted-foreground">هنوز دامی ثبت نشده است.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {canSeeManagement && (
+        <Card>
+          <CardHeader>
+            <CardTitle>پیش‌بینی خوراک</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {feedForecast ? (
+              <ul className="flex flex-col gap-2">
+                {(feedForecast.payload as { feed_type: string; days_remaining: number | null }[]).map(
+                  (f) => (
+                    <li key={f.feed_type} className="flex justify-between text-sm">
+                      <span>{FEED_TYPE_LABELS[f.feed_type] ?? f.feed_type}</span>
+                      <span className={f.days_remaining !== null && f.days_remaining <= 14 ? "text-destructive" : ""}>
+                        {f.days_remaining !== null
+                          ? `${toPersianDigits(f.days_remaining)} روز باقی‌مانده`
+                          : "داده کافی نیست"}
+                      </span>
+                    </li>
+                  )
+                )}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">
+                پیش‌بینی هوشمند پس از تولید اولین گزارش دستیار هوشمند نمایش داده می‌شود.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {canSeeManagement && (
+        <Card>
+          <CardHeader>
+            <CardTitle>رشد ماهانه گله</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {herdGrowth ? (
+              <p>
+                با روند فعلی، جمعیت گله تا ۱۲ ماه آینده به حدود{" "}
+                <strong>
+                  {toPersianDigits(
+                    (herdGrowth.payload as { projected_count_in_12_months: number })
+                      .projected_count_in_12_months
+                  )}
+                </strong>{" "}
+                راس می‌رسد.
+              </p>
+            ) : (
+              <p className="text-muted-foreground">داده کافی برای پیش‌بینی رشد گله وجود ندارد.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {canSeeManagement && (
+        <Card>
+          <CardHeader>
+            <CardTitle>پیشنهادهای دستیار هوشمند</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {aiSuggestions.length > 0 ? (
+              <ul className="flex flex-col gap-2 text-sm">
+                {aiSuggestions.map((insight) => (
+                  <li key={insight.id}>{JSON.stringify(insight.payload)}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">هنوز پیشنهادی تولید نشده است.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {canSeeManagement && (
+        <Card>
+          <CardHeader>
+            <CardTitle>اعلان‌ها</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {notifications.length > 0 ? (
+              <ul className="flex flex-col gap-2 text-sm">
+                {notifications.map((n) => (
+                  <li key={n.id} className="rounded-lg bg-muted p-2">
+                    {n.message}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">اعلان خوانده‌نشده‌ای وجود ندارد.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

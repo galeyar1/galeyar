@@ -1,0 +1,37 @@
+project_id = "galeyar"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://galeyar.ir"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+# No third-party SMS provider is configured here (Twilio/MessageBird/Vonage
+# are unreliable from Iran). Delivery is fully delegated to the send_sms
+# auth hook below, which calls Kavenegar.
+
+# NOTE: verify these keys against the Supabase CLI/dashboard version you
+# deploy with — Auth Hook config syntax has changed across CLI releases.
+[auth.hook.send_sms]
+enabled = true
+uri = "https://<project-ref>.supabase.co/functions/v1/send-sms-hook"
+secrets = "env(SEND_SMS_HOOK_SECRET)"
+
+[storage]
+enabled = true

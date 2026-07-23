@@ -1,0 +1,7 @@
+# Cloudflare Pages config. Galeyar is a pure static export (no Workers/
+# Functions runtime involved) — this file only exists so `wrangler pages
+# deploy` (used by .github/workflows/deploy.yml) knows the output directory.
+
+name = "galeyar"
+pages_build_output_dir = "out"
+compatibility_date = "2025-01-01"
