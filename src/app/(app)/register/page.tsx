@@ -5,6 +5,7 @@ import { Milk, Weight, Stethoscope, Baby, Pill, Syringe, Bug, Wallet, FlaskConic
 import { AnimalNavIcon } from "@/components/animal-nav-icon";
 
 const ITEMS: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
+  { href: "/animals/new", label: "ثبت دام جدید", icon: AnimalNavIcon, color: "text-primary" },
   { href: "/register/milk", label: "ثبت شیر", icon: Milk, color: "text-primary" },
   { href: "/register/weight", label: "ثبت وزن", icon: Weight, color: "text-primary" },
   { href: "/register/disease", label: "ثبت بیماری", icon: Stethoscope, color: "text-destructive" },
@@ -14,7 +15,6 @@ const ITEMS: { href: string; label: string; icon: React.ComponentType<{ classNam
   { href: "/register/deworming", label: "ثبت ضد انگل", icon: Bug, color: "text-success" },
   { href: "/register/finance", label: "ثبت تراکنش مالی", icon: Wallet, color: "text-primary" },
   { href: "/register/genetic-test", label: "ثبت آزمایش ژنتیک", icon: FlaskConical, color: "text-primary" },
-  { href: "/animals/new", label: "ثبت دام جدید", icon: AnimalNavIcon, color: "text-primary" },
 ];
 
 export default function RegisterHubPage() {

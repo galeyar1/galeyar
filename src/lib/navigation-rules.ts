@@ -52,7 +52,7 @@ export const BOTTOM_NAVIGATION: NavRuleItem[] = [
 
 export const HAMBURGER_MENU: NavRuleItem[] = [
   { href: "/pedigree", label: "شجره‌نامه", icon: GitBranch },
-  { href: "/feed", label: "خوراک و جیره", icon: Wheat },
+  { href: "/feed", label: "خوراک", icon: Wheat },
   { href: "/reports", label: "گزارشات", icon: BarChart3 },
   { href: "/business", label: "کسب‌وکار", icon: Briefcase },
   { href: "/business/support", label: "پشتیبانی", icon: LifeBuoy },

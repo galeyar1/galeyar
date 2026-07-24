@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
-import { Plus, Minus, Pencil, Wheat } from "lucide-react";
+import { Plus, Minus, Pencil, Wheat, AlertTriangle } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
+import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,15 @@ import {
 } from "@/components/ui/select";
 import { DeleteIconButton } from "@/components/confirm-dialog";
 import { FEED_TYPE_LABELS, FEED_UNIT_LABELS, feedLabel } from "@/lib/feed-labels";
-import { toPersianDigits } from "@/lib/jalali";
+import { toPersianDigits, todayIso } from "@/lib/jalali";
+import {
+  monthlyFromDaily,
+  annualFromDaily,
+  daysRemaining as dailyRateDaysRemaining,
+  costPerAnimalPerDay,
+} from "@/lib/feed-forecast";
+import { feedCostTrend, previousMonthKey } from "@/lib/feed-alerts";
+import { RATION_TEMPLATES, suggestedDailyConsumption, type RationTemplateId, type Season, type RationAmounts } from "@/lib/ration-templates";
 import type { FeedInventory, FeedConsumptionLog, FeedType, FeedUnit } from "@/lib/supabase/types";
 
 const FEED_TYPES = Object.keys(FEED_TYPE_LABELS) as FeedType[];
@@ -96,22 +106,126 @@ function FeedPortfolioChart({ inventory }: { inventory: FeedInventory[] }) {
   );
 }
 
+function RationCalculator({ activeAnimalCount }: { activeAnimalCount: number }) {
+  const [templateId, setTemplateId] = useState<RationTemplateId | "custom">("traditional");
+  const [headcount, setHeadcount] = useState(String(activeAnimalCount || ""));
+  const [season, setSeason] = useState<Season>("summer");
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+
+  const result: RationAmounts = useMemo(() => {
+    if (templateId !== "custom") {
+      return suggestedDailyConsumption(RATION_TEMPLATES[templateId], Number(headcount) || 0, season);
+    }
+    const amounts: RationAmounts = {};
+    for (const [feedType, value] of Object.entries(customAmounts)) {
+      if (value) amounts[feedType as FeedType] = (Number(value) || 0) * (Number(headcount) || 0);
+    }
+    return amounts;
+  }, [templateId, headcount, season, customAmounts]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>جیره‌های پیشنهادی</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <Select value={templateId} onValueChange={(v) => setTemplateId(v as RationTemplateId)}>
+          <SelectTrigger className="h-12 w-full text-lg"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {Object.values(RATION_TEMPLATES).map((t) => (
+              <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+            ))}
+            <SelectItem value="custom">سفارشی</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">تعداد دام</label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={headcount}
+              onChange={(e) => setHeadcount(e.target.value)}
+              className="h-11"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">فصل (جیره تابستان / زمستان)</label>
+            <Select value={season} onValueChange={(v) => setSeason(v as Season)}>
+              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="summer">تابستان</SelectItem>
+                <SelectItem value="winter">زمستان</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {templateId === "custom" && (
+          <div className="flex flex-col gap-2 rounded-xl bg-muted p-3">
+            <span className="text-xs text-muted-foreground">مقدار به ازای هر دام در روز (کیلوگرم)</span>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(FEED_TYPE_LABELS) as FeedType[])
+                .filter((t) => t !== "custom")
+                .map((t) => (
+                  <div key={t} className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-sm">{FEED_TYPE_LABELS[t]}</span>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      className="h-9"
+                      value={customAmounts[t] ?? ""}
+                      onChange={(e) => setCustomAmounts((a) => ({ ...a, [t]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {Object.keys(result).length > 0 && (
+          <ul className="flex flex-col gap-1.5">
+            {(Object.entries(result) as [FeedType, number][]).map(([type, amount]) => (
+              <li key={type} className="flex justify-between rounded-lg bg-muted p-2 text-sm">
+                <span>{FEED_TYPE_LABELS[type]}</span>
+                <span className="font-semibold">{toPersianDigits(amount.toFixed(1))} کیلوگرم/روز</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function FeedManagementPage() {
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
   const isOwner = profile?.role === "owner";
+  const today = todayIso();
 
   const [inventory, setInventory] = useState<FeedInventory[]>([]);
   const [consumption, setConsumption] = useState<FeedConsumptionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EditState | null>(null);
+  const [rateInputs, setRateInputs] = useState<Record<string, string>>({});
+  const [savingRate, setSavingRate] = useState<string | null>(null);
+  const [trendLogs, setTrendLogs] = useState<FeedConsumptionLog[]>([]);
 
   const [newType, setNewType] = useState<FeedType>("hay");
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [newQty, setNewQty] = useState("");
   const [newUnit, setNewUnit] = useState<FeedUnit>("kg");
   const [newCost, setNewCost] = useState("");
+
+  const activeAnimalCount = useLiveQuery(async () => {
+    if (!farmId) return 0;
+    const rows = await db.animals.where("farm_id").equals(farmId).toArray();
+    return rows.filter((a) => !a.deleted_at && a.status === "active").length;
+  }, [farmId]);
 
   async function loadData() {
     if (!farmId) return;
@@ -131,8 +245,25 @@ export default function FeedManagementPage() {
     setLoading(false);
   }
 
+  async function loadTrendLogs() {
+    if (!farmId) return;
+    // Covers the current and previous calendar month, for the cost-trend
+    // report card below — separate from the 30-day rolling window above so
+    // that fixed range isn't disturbed (per-item cards depend on it).
+    const currentMonthKey = today.slice(0, 7);
+    const sinceMonth = previousMonthKey(currentMonthKey);
+    const since = `${sinceMonth}-01`;
+    const { data } = await supabase
+      .from("feed_consumption_log")
+      .select("*")
+      .eq("farm_id", farmId)
+      .gte("log_date", since);
+    setTrendLogs(data ?? []);
+  }
+
   useEffect(() => {
     void loadData();
+    void loadTrendLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farmId]);
 
@@ -142,11 +273,37 @@ export default function FeedManagementPage() {
       .reduce((sum, c) => sum + Number(c.amount_used), 0);
   }
 
-  function daysRemaining(item: FeedInventory): number | null {
+  /** Prefers the precise daily-rate projection when set; falls back to the trailing-30-day log average otherwise. */
+  function effectiveDaysRemaining(item: FeedInventory): number | null {
+    if (item.daily_rate) return dailyRateDaysRemaining(item.quantity, item.daily_rate);
     const monthly = monthlyConsumption(item.feed_type);
     const dailyAvg = monthly / CONSUMPTION_WINDOW_DAYS;
     return dailyAvg > 0 ? Math.floor(Number(item.quantity) / dailyAvg) : null;
   }
+
+  const costTrend = useMemo(() => {
+    const currentMonthKey = today.slice(0, 7);
+    const unitCostByType: Partial<Record<FeedType, number>> = {};
+    for (const item of inventory) {
+      if (item.unit_cost) unitCostByType[item.feed_type] = item.unit_cost;
+    }
+    return feedCostTrend(trendLogs, unitCostByType, currentMonthKey, previousMonthKey(currentMonthKey));
+  }, [trendLogs, inventory, today]);
+
+  const totalInventoryValue = useMemo(
+    () => inventory.reduce((sum, i) => sum + (i.unit_cost ? Number(i.quantity) * i.unit_cost : 0), 0),
+    [inventory]
+  );
+
+  const urgentItems = useMemo(
+    () =>
+      inventory
+        .map((item) => ({ item, remaining: effectiveDaysRemaining(item) }))
+        .filter((x): x is { item: FeedInventory; remaining: number } => x.remaining !== null && x.remaining <= 14)
+        .sort((a, b) => a.remaining - b.remaining),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inventory, consumption]
+  );
 
   async function addStock(item: FeedInventory) {
     const delta = Number(amount[item.id] ?? 0);
@@ -181,6 +338,22 @@ export default function FeedManagementPage() {
 
     setAmount((a) => ({ ...a, [item.id]: "" }));
     toast.success("مصرف ثبت شد");
+    void loadData();
+    void loadTrendLogs();
+  }
+
+  async function saveDailyRate(item: FeedInventory) {
+    const value = rateInputs[item.id];
+    if (value === undefined) return;
+    setSavingRate(item.id);
+    const rate = value === "" ? null : Number(value);
+    const { error } = await supabase.from("feed_inventory").update({ daily_rate: rate }).eq("id", item.id);
+    setSavingRate(null);
+    if (error) {
+      toast.error(`ذخیره نرخ مصرف ناموفق بود: ${error.message}`);
+      return;
+    }
+    toast.success("نرخ مصرف روزانه ذخیره شد");
     void loadData();
   }
 
@@ -229,7 +402,7 @@ export default function FeedManagementPage() {
   if (!isOwner) {
     return (
       <div className="flex flex-col gap-4 p-4">
-        <h1 className="text-xl font-bold">مدیریت خوراک</h1>
+        <h1 className="text-xl font-bold">خوراک</h1>
         <FeedPortfolioChart inventory={inventory} />
         {loading ? null : inventory.length === 0 ? (
           <p className="text-center text-muted-foreground">موجودی خوراکی ثبت نشده است.</p>
@@ -251,15 +424,61 @@ export default function FeedManagementPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <h1 className="text-xl font-bold">مدیریت خوراک</h1>
+      <h1 className="text-xl font-bold">خوراک</h1>
+
+      {urgentItems.length > 0 && (
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="size-4" /> پیش‌بینی مصرف
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1.5 text-sm">
+            {urgentItems.map(({ item, remaining }) => (
+              <p key={item.id}>
+                {feedLabel(item)} تا {toPersianDigits(remaining)} روز دیگر تمام می‌شود.
+              </p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>گزارش خوراک</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-2 text-sm">
+          <div className="flex flex-col rounded-lg bg-muted p-2">
+            <span className="text-xs text-muted-foreground">ارزش کل موجودی</span>
+            <span className="font-semibold">{toPersianDigits(totalInventoryValue.toLocaleString())} تومان</span>
+          </div>
+          <div className="flex flex-col rounded-lg bg-muted p-2">
+            <span className="text-xs text-muted-foreground">هزینه خوراک این ماه</span>
+            <span className="font-semibold">
+              {toPersianDigits(costTrend.currentTotal.toLocaleString())} تومان
+              {costTrend.changePercent !== null && (
+                <span className={costTrend.changePercent > 0 ? "text-destructive" : "text-success"}>
+                  {" "}
+                  ({costTrend.changePercent > 0 ? "+" : ""}
+                  {toPersianDigits(costTrend.changePercent)}٪)
+                </span>
+              )}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
       <FeedPortfolioChart inventory={inventory} />
 
       <ul className="flex flex-col gap-3">
         {inventory.map((item) => {
-          const remaining = daysRemaining(item);
-          const monthly = monthlyConsumption(item.feed_type);
+          const remaining = effectiveDaysRemaining(item);
+          const monthly = item.daily_rate ? monthlyFromDaily(item.daily_rate) : monthlyConsumption(item.feed_type);
+          const annual = item.daily_rate ? annualFromDaily(item.daily_rate) : monthly * 12;
           const totalValue = item.unit_cost ? item.quantity * item.unit_cost : null;
+          const costPerAnimal = item.daily_rate
+            ? costPerAnimalPerDay(item.daily_rate, item.unit_cost, activeAnimalCount ?? 0)
+            : null;
           return (
             <li key={item.id} className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3">
               <div className="flex items-center justify-between">
@@ -295,12 +514,29 @@ export default function FeedManagementPage() {
                 </div>
               </div>
 
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  placeholder="مصرف روزانه"
+                  value={rateInputs[item.id] ?? (item.daily_rate ?? "")}
+                  onChange={(e) => setRateInputs((r) => ({ ...r, [item.id]: e.target.value }))}
+                  className="h-10 flex-1"
+                />
+                <Button size="sm" variant="secondary" onClick={() => saveDailyRate(item)} disabled={savingRate === item.id}>
+                  {savingRate === item.id ? "…" : "ذخیره نرخ"}
+                </Button>
+              </div>
+
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span>مصرف ماهانه: {toPersianDigits(monthly.toFixed(1))} {FEED_UNIT_LABELS[item.unit]}</span>
+                <span>مصرف سالانه: {toPersianDigits(annual.toFixed(1))} {FEED_UNIT_LABELS[item.unit]}</span>
                 <span className={remaining !== null && remaining <= 14 ? "text-destructive" : ""}>
                   {remaining !== null ? `${toPersianDigits(remaining)} روز تا اتمام` : "پیش‌بینی: داده کافی نیست"}
                 </span>
                 {totalValue !== null && <span>ارزش موجودی: {toPersianDigits(totalValue.toLocaleString())} تومان</span>}
+                {costPerAnimal !== null && <span>هزینه هر دام/روز: {toPersianDigits(costPerAnimal.toFixed(0))} تومان</span>}
               </div>
 
               <div className="flex gap-2">
@@ -394,6 +630,8 @@ export default function FeedManagementPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <RationCalculator activeAnimalCount={activeAnimalCount ?? 0} />
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>

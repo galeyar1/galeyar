@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -18,18 +18,24 @@ import {
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toPersianDigits, todayIso } from "@/lib/jalali";
 import { daysUntilBirth, pregnancyStage } from "@/lib/pregnancy";
-import { daysRemaining as feedDaysRemaining } from "@/lib/feed-forecast";
 import { feverAlertLevel } from "@/lib/disease-alerts";
 import { vaccinationDueStatus } from "@/lib/vaccination-alerts";
 import { daysSinceLastDeworming, dewormingOverdue } from "@/lib/deworming-alerts";
 import { computePedigreeFarmStats } from "@/lib/pedigree-stats";
 import { mostCommonExitReason, EXIT_REASON_LABELS } from "@/lib/exit-reasons";
 import { isoToJalali } from "@/lib/jalali";
+import {
+  feedRunningOutAlerts,
+  consumptionTrends,
+  feedCostTrend,
+  pregnantEweRationSuggestion,
+  previousMonthKey,
+} from "@/lib/feed-alerts";
 import type { PedigreeAnimal } from "@/lib/pedigree";
-import type { AiInsight, FeedInventory } from "@/lib/supabase/types";
+import type { AiInsight, FeedInventory, FeedConsumptionLog, FeedType } from "@/lib/supabase/types";
 
 interface MilkTrendPayload {
   recent_daily_avg_liters: number;
@@ -49,26 +55,30 @@ export default function AiCenterPage() {
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
   const today = todayIso();
-  const [feedAlertCount, setFeedAlertCount] = useState<number | null>(null);
+  const [feedInventory, setFeedInventory] = useState<FeedInventory[]>([]);
+  const [feedTrendLogs, setFeedTrendLogs] = useState<FeedConsumptionLog[]>([]);
   const [milkTrend, setMilkTrend] = useState<MilkTrendPayload | null>(null);
 
   useEffect(() => {
-    // feed_inventory isn't offline-synced yet (pre-existing, same as the
-    // /feed management page) — this count needs a connection.
+    // feed_inventory/feed_consumption_log aren't offline-synced yet
+    // (pre-existing, same as the /feed management page) — this needs a
+    // connection. AI only reads this data to generate alert text below; all
+    // feed *management* UI lives in /feed now.
     if (!farmId) return;
+    const currentMonthKey = today.slice(0, 7);
+    const since = `${previousMonthKey(currentMonthKey)}-01`;
     supabase
       .from("feed_inventory")
-      .select("quantity, daily_rate")
+      .select("*")
       .eq("farm_id", farmId)
-      .then(({ data }) => {
-        const items = (data ?? []) as Pick<FeedInventory, "quantity" | "daily_rate">[];
-        const alerts = items.filter((i) => {
-          const remaining = feedDaysRemaining(i.quantity, i.daily_rate);
-          return remaining !== null && remaining <= 14;
-        });
-        setFeedAlertCount(alerts.length);
-      });
-  }, [farmId]);
+      .then(({ data }) => setFeedInventory((data ?? []) as FeedInventory[]));
+    supabase
+      .from("feed_consumption_log")
+      .select("*")
+      .eq("farm_id", farmId)
+      .gte("log_date", since)
+      .then(({ data }) => setFeedTrendLogs((data ?? []) as FeedConsumptionLog[]));
+  }, [farmId, today]);
 
   useEffect(() => {
     // Generated server-side by the generate-ai-insights Edge Function
@@ -141,9 +151,45 @@ export default function AiCenterPage() {
     return mostCommonExitReason(rows, (updatedAt) => isoToJalali(updatedAt.slice(0, 10)).jy === currentJalaliYear);
   }, [farmId, today]);
 
+  const feedAlertLines = useMemo(() => {
+    const lines: string[] = [];
+    const currentMonthKey = today.slice(0, 7);
+    const priorMonthKey = previousMonthKey(currentMonthKey);
+
+    for (const alert of feedRunningOutAlerts(feedInventory)) {
+      lines.push(`${alert.label} تا ${toPersianDigits(alert.daysRemaining)} روز دیگر تمام می‌شود.`);
+    }
+
+    for (const trend of consumptionTrends(feedTrendLogs, currentMonthKey, priorMonthKey)) {
+      const direction = trend.changePercent > 0 ? "افزایش" : "کاهش";
+      lines.push(`مصرف ${trend.label} این ماه ${toPersianDigits(Math.abs(trend.changePercent))}٪ ${direction} یافته است.`);
+    }
+
+    const unitCostByType: Partial<Record<FeedType, number>> = {};
+    for (const item of feedInventory) {
+      if (item.unit_cost) unitCostByType[item.feed_type] = item.unit_cost;
+    }
+    const cost = feedCostTrend(feedTrendLogs, unitCostByType, currentMonthKey, priorMonthKey);
+    if (cost.changePercent !== null && cost.changePercent > 0) {
+      lines.push("هزینه خوراک این ماه نسبت به ماه قبل بیشتر شده است.");
+    } else if (cost.changePercent !== null && cost.changePercent < 0) {
+      lines.push("هزینه خوراک این ماه نسبت به ماه قبل کمتر شده است.");
+    }
+
+    const rationSuggestion = pregnantEweRationSuggestion(pregnancyStats?.pregnant ?? 0);
+    if (rationSuggestion) {
+      lines.push(
+        `برای ${toPersianDigits(rationSuggestion.pregnantCount)} میش آبستن، افزایش ${toPersianDigits(
+          rationSuggestion.increasePercent
+        )}٪ یونجه پیشنهاد می‌شود.`
+      );
+    }
+
+    return lines;
+  }, [feedInventory, feedTrendLogs, pregnancyStats, today]);
+
   const menu: MenuItem[] = [
     { href: "/ai/pregnancy", label: "آبستنی", icon: Baby, count: pregnancyStats?.pregnant ?? null, tone: "default" },
-    { href: "/ai/feed", label: "خوراک و جیره", icon: Wheat, count: feedAlertCount, tone: "alert" },
     { href: "/ai/disease", label: "بیماری", icon: Stethoscope, count: diseaseAlertCount ?? null, tone: "alert" },
     { href: "/ai/vaccination", label: "واکسیناسیون", icon: Syringe, count: vaccinationAlertCount ?? null, tone: "alert" },
     { href: "/ai/deworming", label: "ضد انگل", icon: Bug, count: dewormingAlertCount ?? null, tone: "alert" },
@@ -154,9 +200,6 @@ export default function AiCenterPage() {
   const summaryLines: string[] = [];
   if (pregnancyStats && pregnancyStats.nearBirth > 0) {
     summaryLines.push(`${toPersianDigits(pregnancyStats.nearBirth)} دام نزدیک زایمان هستند.`);
-  }
-  if (feedAlertCount !== null && feedAlertCount > 0) {
-    summaryLines.push(`${toPersianDigits(feedAlertCount)} نوع خوراک تا ۱۴ روز آینده تمام می‌شود.`);
   }
   if (vaccinationAlertCount) {
     summaryLines.push(`${toPersianDigits(vaccinationAlertCount)} دام نیازمند واکسیناسیون هستند.`);
@@ -214,6 +257,31 @@ export default function AiCenterPage() {
           </Link>
         ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wheat className="size-4 text-primary" /> اعلان‌های خوراک
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {feedAlertLines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">اعلان خوراکی فعالی وجود ندارد.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {feedAlertLines.map((line, i) => (
+                <li key={i} className="flex items-start gap-1.5">
+                  <ChevronLeft className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link href="/feed" className="text-sm font-medium text-primary">
+            مشاهده در خوراک ←
+          </Link>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="flex flex-col gap-2 p-4">
