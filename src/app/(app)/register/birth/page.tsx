@@ -23,6 +23,8 @@ import {
   nextOffspringNumbers,
   offspringTitle,
 } from "@/lib/offspring-id";
+import { inbreedingWarning } from "@/lib/pedigree-ai";
+import type { PedigreeAnimal } from "@/lib/pedigree";
 
 /** Highest offspring_number already used for this mother+year+gender, or 0 if none — so a second litter the same year keeps numbering instead of colliding. */
 async function existingMaxOffspringNumber(
@@ -58,6 +60,18 @@ function BirthForm({ recordId }: { recordId: string | null }) {
 
   const existing = useLiveQuery(() => (recordId ? db.birth_records.get(recordId) : undefined), [recordId]);
   const mother = useLiveQuery(() => (motherId ? db.animals.get(motherId) : undefined), [motherId]);
+  const father = useLiveQuery(() => (fatherId ? db.animals.get(fatherId) : undefined), [fatherId]);
+
+  // Farm-wide lookup for the inbreeding check below — only fetched once both
+  // parents are picked, since that's the only time it's needed.
+  const farmAnimalsById = useLiveQuery(async () => {
+    if (!profile?.farm_id || !motherId || !fatherId) return null;
+    const rows = await db.animals.where("farm_id").equals(profile.farm_id).toArray();
+    return new Map(rows.filter((a) => !a.deleted_at).map((a) => [a.id, a as PedigreeAnimal]));
+  }, [profile?.farm_id, motherId, fatherId]);
+
+  const matingWarning =
+    mother && father && farmAnimalsById ? inbreedingWarning(father, mother, farmAnimalsById) : null;
 
   const previewIds = useLiveQuery(async () => {
     if (recordId || !mother || !profile?.farm_id) return [];
@@ -190,6 +204,10 @@ function BirthForm({ recordId }: { recordId: string | null }) {
         <label className="text-base">پدر (اختیاری)</label>
         <AnimalPicker farmId={profile?.farm_id} value={fatherId} onChange={setFatherId} filter="male" allowNone />
       </div>
+
+      {matingWarning && (
+        <div className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{matingWarning}</div>
+      )}
 
       <div className="flex flex-col gap-2">
         <label className="text-base">تاریخ زایمان</label>

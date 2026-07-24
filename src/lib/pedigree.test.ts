@@ -3,6 +3,11 @@ import {
   buildAncestorTree,
   buildDescendantTree,
   countDescendants,
+  ancestorDepth,
+  descendantDepth,
+  flattenAncestors,
+  flattenDescendants,
+  MAX_ANCESTOR_GENERATIONS,
   type PedigreeAnimal,
 } from "@/lib/pedigree";
 
@@ -60,6 +65,23 @@ describe("buildAncestorTree", () => {
     // depth reached maxDepth (2) at node.father, so it should not expand further
     expect(node?.father?.father).toBeNull();
   });
+
+  it("supports 10+ generations by default", () => {
+    expect(MAX_ANCESTOR_GENERATIONS).toBeGreaterThanOrEqual(10);
+  });
+
+  it("never infinite-loops on a corrupted circular chain", () => {
+    // "1" is its own great-grandparent — invalid data, but must terminate.
+    const a1 = animal("1", "1", "3");
+    const a2 = animal("2", "2", "1");
+    const a3 = animal("3", "3", "2");
+    const byId = new Map([
+      ["1", a1],
+      ["2", a2],
+      ["3", a3],
+    ]);
+    expect(() => buildAncestorTree("1", "پدر", byId, () => null)).not.toThrow();
+  });
 });
 
 describe("buildDescendantTree", () => {
@@ -104,5 +126,57 @@ describe("countDescendants", () => {
 
   it("returns 0 for an empty tree", () => {
     expect(countDescendants([])).toBe(0);
+  });
+});
+
+describe("ancestorDepth", () => {
+  it("is 0 when there are no known parents", () => {
+    const node = buildAncestorTree("s", "پدر", new Map([["s", animal("s", "solo")]]), () => null);
+    expect(ancestorDepth(node)).toBe(0);
+  });
+
+  it("counts the deepest known generation", () => {
+    const grandfather = animal("gf", "100");
+    const father = animal("f", "200", "gf");
+    const byId = new Map([
+      ["gf", grandfather],
+      ["f", father],
+    ]);
+    const node = buildAncestorTree("f", "پدر", byId, () => null);
+    expect(ancestorDepth(node)).toBe(1);
+  });
+});
+
+describe("descendantDepth", () => {
+  it("is 0 for no offspring", () => {
+    expect(descendantDepth([])).toBe(0);
+  });
+
+  it("counts grandchildren as depth 2", () => {
+    const tree = buildDescendantTree("gp", [animal("gp", "gp"), animal("p", "p", null, "gp"), animal("c", "c", null, "p")]);
+    expect(descendantDepth(tree)).toBe(2);
+  });
+});
+
+describe("flattenAncestors / flattenDescendants", () => {
+  it("flattens ancestors with their generation depth, excluding the root itself", () => {
+    const grandfather = animal("gf", "100");
+    const father = animal("f", "200", "gf");
+    const byId = new Map([
+      ["gf", grandfather],
+      ["f", father],
+    ]);
+    const node = buildAncestorTree("f", "پدر", byId, () => null);
+    const flat = flattenAncestors(node);
+    expect(flat.map((f) => [f.animal.ear_tag, f.depth])).toEqual([["100", 1]]);
+  });
+
+  it("flattens descendants with their generation depth", () => {
+    const tree = buildDescendantTree("gp", [animal("gp", "gp"), animal("p", "p", null, "gp"), animal("c", "c", null, "p")]);
+    const flat = flattenDescendants(tree);
+    expect(flat.map((f) => [f.animal.ear_tag, f.depth])).toEqual([
+      ["p", 1],
+      ["c", 2],
+    ]);
   });
 });

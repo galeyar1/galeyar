@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -29,6 +29,7 @@ import {
   Building2,
   CloudUpload,
   Syringe,
+  GitBranch,
 } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
@@ -39,6 +40,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnimalNavIcon } from "@/components/animal-nav-icon";
 import { SPECIES_LABELS, effectiveAnimalType, portfolioColor } from "@/lib/animal-labels";
 import { feedLabel } from "@/lib/feed-labels";
+import { computePedigreeFarmStats } from "@/lib/pedigree-stats";
+import type { PedigreeAnimal } from "@/lib/pedigree";
 import { todayIso, toPersianDigits } from "@/lib/jalali";
 import type {
   AiInsight,
@@ -138,6 +141,16 @@ export default function DashboardPage() {
     const rows = await db.animals.where("farm_id").equals(farmId).toArray();
     return rows.filter((a) => !a.deleted_at && a.status === "active");
   }, [farmId]);
+
+  // Pedigree relationships don't care about sold/dead status, so this is a
+  // separate (all-status) query from the `animals` one above.
+  const pedigreeAnimals = useLiveQuery(async () => {
+    if (!farmId) return [];
+    const rows = await db.animals.where("farm_id").equals(farmId).toArray();
+    return rows.filter((a) => !a.deleted_at) as PedigreeAnimal[];
+  }, [farmId]);
+
+  const pedigreeStats = useMemo(() => computePedigreeFarmStats(pedigreeAnimals ?? []), [pedigreeAnimals]);
 
   const todayMilk = useLiveQuery(async () => {
     if (!farmId) return 0;
@@ -406,6 +419,48 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {pedigreeStats.totalFamilyTrees > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitBranch className="size-4 text-primary" />
+              شجره‌نامه
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-muted p-3 text-center">
+              <div className="text-xl font-bold text-primary">{toPersianDigits(pedigreeStats.totalFamilyTrees)}</div>
+              <div className="text-xs text-muted-foreground">شجره‌نامه ثبت‌شده</div>
+            </div>
+            <div className="rounded-xl bg-muted p-3 text-center">
+              <div className="text-xl font-bold text-primary">{toPersianDigits(pedigreeStats.totalGenerations)}</div>
+              <div className="text-xs text-muted-foreground">بیشترین تعداد نسل</div>
+            </div>
+            <div className="col-span-2 rounded-xl bg-muted p-3 text-center">
+              <div className="text-sm text-muted-foreground">بزرگ‌ترین دودمان</div>
+              <div className="font-bold">
+                {pedigreeStats.largestBloodline
+                  ? `${pedigreeStats.largestBloodline.rootEarTag} (${toPersianDigits(
+                      pedigreeStats.largestBloodline.descendantCount
+                    )} نسل)`
+                  : "—"}
+              </div>
+            </div>
+            <div
+              className={`col-span-2 rounded-xl p-3 text-center ${
+                pedigreeStats.inbreedingAlerts > 0 ? "bg-destructive/10 text-destructive" : "bg-muted"
+              }`}
+            >
+              <div className="text-xl font-bold">{toPersianDigits(pedigreeStats.inbreedingAlerts)}</div>
+              <div className="text-xs">هشدار همخونی</div>
+            </div>
+            <Link href="/pedigree" className="col-span-2 text-center text-sm text-primary">
+              مشاهده شجره‌نامه‌ها
+            </Link>
           </CardContent>
         </Card>
       )}

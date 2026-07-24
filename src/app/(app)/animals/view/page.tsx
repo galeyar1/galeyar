@@ -288,7 +288,7 @@ function AnimalDetail({ animalId }: { animalId: string }) {
             <InfoRow label="تعداد زایمان" value={toPersianDigits(familyStats?.birthEventCount ?? 0)} />
           </div>
           <Button variant="outline" size="sm" asChild className="self-start">
-            <Link href={`/animals/pedigree?id=${animal.id}`}>
+            <Link href={`/pedigree/view?id=${animal.id}`}>
               <GitBranch className="size-4" />
               مشاهده شجره‌نامه
             </Link>

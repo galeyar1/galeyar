@@ -141,3 +141,20 @@
     @apply font-sans;
   }
 }
+
+/* "Print Tree" (pedigree module): print only the tree/graph, not the app
+   chrome (header, bottom nav, buttons) around it. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .pedigree-print-area,
+  .pedigree-print-area * {
+    visibility: visible;
+  }
+  .pedigree-print-area {
+    position: fixed;
+    inset: 0;
+    padding: 12px;
+  }
+}

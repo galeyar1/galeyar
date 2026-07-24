@@ -13,6 +13,7 @@ import {
   Home as HomeIcon,
   Wheat,
   ArrowRight,
+  GitBranch,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -31,6 +32,7 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   owner: [
     { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
     { href: "/animals", label: "دام‌ها", icon: AnimalNavIcon },
+    { href: "/pedigree", label: "شجره‌نامه", icon: GitBranch },
     { href: "/register", label: "ثبت", icon: ClipboardPlus },
     { href: "/feed", label: "خوراک", icon: Wheat },
     { href: "/reports", label: "گزارش", icon: BarChart3 },
@@ -43,11 +45,13 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   ],
   vet: [
     { href: "/animals", label: "دام‌ها", icon: AnimalNavIcon },
+    { href: "/pedigree", label: "شجره‌نامه", icon: GitBranch },
     { href: "/register", label: "ثبت درمان", icon: ClipboardPlus },
     { href: "/history", label: "تاریخچه", icon: History },
   ],
   consultant: [
     { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+    { href: "/pedigree", label: "شجره‌نامه", icon: GitBranch },
     { href: "/reports", label: "گزارش", icon: BarChart3 },
     { href: "/ai", label: "دستیار", icon: Sparkles },
   ],
@@ -68,7 +72,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/ai": "دستیار هوشمند",
   "/farms": "مزرعه‌های من",
   "/farms/new": "ساخت مزرعه جدید",
-  "/animals/pedigree": "شجره‌نامه",
+  "/pedigree/view": "شجره‌نامه",
   "/register/vaccination": "ثبت واکسیناسیون",
 };
 
@@ -76,7 +80,7 @@ const PAGE_TITLES: Record<string, string> = {
 const BREADCRUMBS: Record<string, { label: string; href: string }[]> = {
   "/animals/new": [{ label: "دام‌ها", href: "/animals" }],
   "/animals/view": [{ label: "دام‌ها", href: "/animals" }],
-  "/animals/pedigree": [{ label: "دام‌ها", href: "/animals" }],
+  "/pedigree/view": [{ label: "شجره‌نامه", href: "/pedigree" }],
   "/register/milk": [{ label: "ثبت", href: "/register" }],
   "/register/weight": [{ label: "ثبت", href: "/register" }],
   "/register/disease": [{ label: "ثبت", href: "/register" }],
@@ -87,7 +91,7 @@ const BREADCRUMBS: Record<string, { label: string; href: string }[]> = {
 };
 
 /** Routes that show the brand mark + settings gear instead of a back button — the roots of each bottom-nav tab. */
-const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/register", "/history", "/home"]);
+const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/pedigree", "/register", "/history", "/home"]);
 
 /**
  * Fallback destination when there's no browser history to go back to — e.g.
@@ -109,7 +113,7 @@ const BACK_FALLBACK: Record<string, string> = {
   "/ai": "/dashboard",
   "/farms": "/dashboard",
   "/farms/new": "/farms",
-  "/animals/pedigree": "/animals",
+  "/pedigree/view": "/pedigree",
   "/register/vaccination": "/register",
 };
 
