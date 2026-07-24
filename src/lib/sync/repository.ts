@@ -13,6 +13,28 @@ function localTable(table: SyncableTable) {
   return db.table(table);
 }
 
+const LOCAL_WRITE_TIMEOUT_MS = 10_000;
+
+/**
+ * IndexedDB has no real "cancel" — but a hung transaction (a blocked schema
+ * upgrade from another open tab, or WebKit's well-known bug where IndexedDB
+ * simply never resolves in Safari private browsing) must not leave the
+ * caller's loading state stuck forever. This bounds the wait and rejects
+ * with a message safe to show directly to the user, so every form using
+ * createRecord/updateRecord gets timeout protection for free.
+ */
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`ذخیره‌سازی محلی (${label}) بیش از حد طول کشید. لطفاً دوباره تلاش کنید.`)),
+        LOCAL_WRITE_TIMEOUT_MS
+      );
+    }),
+  ]);
+}
+
 type NewRecordInput = Record<string, unknown>;
 
 export async function createRecord(
@@ -35,15 +57,18 @@ export async function createRecord(
     sync_status: "pending",
   };
 
-  await localTable(table).put(record);
-  await db.sync_queue.add({
-    table,
-    operation: "insert",
-    recordId: id,
-    payload: record,
-    createdAt: Date.now(),
-    retryCount: 0,
-  });
+  await withTimeout(localTable(table).put(record), table);
+  await withTimeout(
+    db.sync_queue.add({
+      table,
+      operation: "insert",
+      recordId: id,
+      payload: record,
+      createdAt: Date.now(),
+      retryCount: 0,
+    }),
+    "sync_queue"
+  );
 
   void triggerSync();
   return id;
@@ -55,18 +80,21 @@ export async function updateRecord(
   patch: NewRecordInput
 ): Promise<void> {
   const changes = { ...patch, updated_at: new Date().toISOString(), sync_status: "pending" as const };
-  await localTable(table).update(id, changes);
-  const updated = await localTable(table).get(id);
+  await withTimeout(localTable(table).update(id, changes), table);
+  const updated = await withTimeout(localTable(table).get(id), table);
   if (!updated) return;
 
-  await db.sync_queue.add({
-    table,
-    operation: "update",
-    recordId: id,
-    payload: updated,
-    createdAt: Date.now(),
-    retryCount: 0,
-  });
+  await withTimeout(
+    db.sync_queue.add({
+      table,
+      operation: "update",
+      recordId: id,
+      payload: updated,
+      createdAt: Date.now(),
+      retryCount: 0,
+    }),
+    "sync_queue"
+  );
 
   void triggerSync();
 }

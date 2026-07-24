@@ -41,6 +41,7 @@ function TreatmentForm({ recordId }: { recordId: string | null }) {
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
     setSubmitting(true);
+    console.log("[register/treatment] submitting", { recordId, animalId, medication, treatmentDate });
 
     const payload = {
       animal_id: animalId,
@@ -49,16 +50,21 @@ function TreatmentForm({ recordId }: { recordId: string | null }) {
       notes: notes || null,
     };
 
-    if (recordId) {
-      await updateRecord("treatments", recordId, payload);
-      toast.success("درمان به‌روزرسانی شد");
-    } else {
-      await createRecord("treatments", profile.farm_id, session.user.id, payload);
-      toast.success("درمان با موفقیت ثبت شد");
+    try {
+      if (recordId) {
+        await updateRecord("treatments", recordId, payload);
+        toast.success("درمان به‌روزرسانی شد");
+      } else {
+        await createRecord("treatments", profile.farm_id, session.user.id, payload);
+        toast.success("درمان با موفقیت ثبت شد");
+      }
+      router.push("/register");
+    } catch (error) {
+      console.error("[register/treatment] failed", error);
+      toast.error(error instanceof Error ? error.message : "ثبت درمان با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
-    router.push("/register");
   }
 
   return (

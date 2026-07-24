@@ -43,6 +43,7 @@ function VaccinationForm({ recordId }: { recordId: string | null }) {
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
     setSubmitting(true);
+    console.log("[register/vaccination] submitting", { recordId, animalId, vaccineName, dateGiven, nextDueDate });
 
     const payload = {
       animal_id: animalId,
@@ -52,16 +53,21 @@ function VaccinationForm({ recordId }: { recordId: string | null }) {
       notes: notes || null,
     };
 
-    if (recordId) {
-      await updateRecord("vaccinations", recordId, payload);
-      toast.success("واکسیناسیون به‌روزرسانی شد");
-    } else {
-      await createRecord("vaccinations", profile.farm_id, session.user.id, payload);
-      toast.success("واکسیناسیون با موفقیت ثبت شد");
+    try {
+      if (recordId) {
+        await updateRecord("vaccinations", recordId, payload);
+        toast.success("واکسیناسیون به‌روزرسانی شد");
+      } else {
+        await createRecord("vaccinations", profile.farm_id, session.user.id, payload);
+        toast.success("واکسیناسیون با موفقیت ثبت شد");
+      }
+      router.push("/register");
+    } catch (error) {
+      console.error("[register/vaccination] failed", error);
+      toast.error(error instanceof Error ? error.message : "ثبت واکسیناسیون با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
-    router.push("/register");
   }
 
   return (

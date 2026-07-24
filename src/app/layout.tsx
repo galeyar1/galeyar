@@ -14,11 +14,18 @@ const vazirmatn = Vazirmatn({
   display: "swap",
 });
 
+// Bump this on every future icon change — Safari's home-screen icon cache in
+// particular ignores normal HTTP cache headers and largely only re-fetches
+// when the URL itself changes. Query-string versioning is the standard,
+// simplest way to force that without renaming every reference each time.
+const ICON_VERSION = "2";
+const iconUrl = (path: string) => `${path}?v=${ICON_VERSION}`;
+
 export const metadata: Metadata = {
   title: "گله‌یار | دستیار هوشمند مدیریت دامداری",
   description: "دستیار هوشمند مدیریت دامداری",
   applicationName: "گله‌یار",
-  manifest: "/manifest.webmanifest",
+  manifest: iconUrl("/manifest.webmanifest"),
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -26,12 +33,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: iconUrl("/icons/favicon-16.png"), sizes: "16x16", type: "image/png" },
+      { url: iconUrl("/icons/favicon-32.png"), sizes: "32x32", type: "image/png" },
+      { url: iconUrl("/icons/icon-192.png"), sizes: "192x192", type: "image/png" },
+      { url: iconUrl("/icons/icon-512.png"), sizes: "512x512", type: "image/png" },
     ],
-    shortcut: [{ url: "/icons/favicon-32.png" }],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: [{ url: iconUrl("/icons/favicon-32.png") }],
+    apple: [{ url: iconUrl("/apple-touch-icon.png"), sizes: "180x180", type: "image/png" }],
   },
 };
 

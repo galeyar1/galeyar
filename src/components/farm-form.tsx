@@ -62,50 +62,57 @@ export function FarmForm({ submitLabel, onSuccess }: FarmFormProps) {
   async function onSubmit(values: FormValues) {
     if (!session) return;
     setSubmitting(true);
+    console.log("[farm-form] submitting", values);
 
-    // Generated client-side and inserted without .select(): right after this
-    // insert, current_farm_id() (used by farms_select_own's RLS policy) may
-    // still point at a different farm — asking PostgREST to return the row
-    // via RETURNING would fail the SELECT policy on it. Not needing the row
-    // back sidesteps that entirely.
-    const farmId = crypto.randomUUID();
+    try {
+      // Generated client-side and inserted without .select(): right after this
+      // insert, current_farm_id() (used by farms_select_own's RLS policy) may
+      // still point at a different farm — asking PostgREST to return the row
+      // via RETURNING would fail the SELECT policy on it. Not needing the row
+      // back sidesteps that entirely.
+      const farmId = crypto.randomUUID();
 
-    const { error: farmError } = await supabase
-      .from("farms")
-      .insert({ id: farmId, farm_name: values.farm_name, province: values.province, city: values.city });
+      const { error: farmError } = await supabase
+        .from("farms")
+        .insert({ id: farmId, farm_name: values.farm_name, province: values.province, city: values.city });
 
-    if (farmError) {
+      if (farmError) {
+        console.error("[farm-form] farm insert failed", farmError);
+        toast.error(`ثبت مزرعه ناموفق بود: ${farmError.message}`);
+        return;
+      }
+
+      const { error: memberError } = await supabase
+        .from("farm_members")
+        .insert({ farm_id: farmId, user_id: session.user.id });
+
+      if (memberError) {
+        console.error("[farm-form] farm_members insert failed", memberError);
+        toast.error(`ثبت عضویت مزرعه ناموفق بود: ${memberError.message}`);
+        return;
+      }
+
+      const { error: userError } = await supabase
+        .from("users")
+        .update({ farm_id: farmId })
+        .eq("id", session.user.id);
+
+      if (userError) {
+        console.error("[farm-form] user farm_id update failed", userError);
+        toast.error(`اتصال مزرعه به حساب شما ناموفق بود: ${userError.message}`);
+        return;
+      }
+
+      await refreshProfile();
+      void triggerSync();
+      toast.success("مزرعه با موفقیت ثبت شد.");
+      onSuccess();
+    } catch (error) {
+      console.error("[farm-form] unexpected failure", error);
+      toast.error(error instanceof Error ? error.message : "ثبت مزرعه با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+    } finally {
       setSubmitting(false);
-      toast.error(`ثبت مزرعه ناموفق بود: ${farmError.message}`);
-      return;
     }
-
-    const { error: memberError } = await supabase
-      .from("farm_members")
-      .insert({ farm_id: farmId, user_id: session.user.id });
-
-    if (memberError) {
-      setSubmitting(false);
-      toast.error(`ثبت عضویت مزرعه ناموفق بود: ${memberError.message}`);
-      return;
-    }
-
-    const { error: userError } = await supabase
-      .from("users")
-      .update({ farm_id: farmId })
-      .eq("id", session.user.id);
-
-    setSubmitting(false);
-
-    if (userError) {
-      toast.error(`اتصال مزرعه به حساب شما ناموفق بود: ${userError.message}`);
-      return;
-    }
-
-    await refreshProfile();
-    void triggerSync();
-    toast.success("مزرعه با موفقیت ثبت شد.");
-    onSuccess();
   }
 
   return (

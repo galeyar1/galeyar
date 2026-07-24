@@ -60,36 +60,47 @@ function DiseaseForm({ recordId }: { recordId: string | null }) {
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
     setSubmitting(true);
+    console.log("[register/disease] submitting", { recordId, animalId, diseaseType, recordDate, hasImage: !!image });
 
-    let imageUrl: string | null = existing?.image_url ?? null;
-    if (image) {
-      if (!navigator.onLine) {
-        toast.warning("چون آفلاین هستید، عکس بارگذاری نشد؛ گزارش بدون عکس ثبت می‌شود");
-      } else {
-        const path = `${profile.farm_id}/${animalId}/${Date.now()}-${image.name}`;
-        const { error } = await supabase.storage.from("disease-images").upload(path, image);
-        if (!error) imageUrl = path;
+    try {
+      let imageUrl: string | null = existing?.image_url ?? null;
+      if (image) {
+        if (!navigator.onLine) {
+          toast.warning("چون آفلاین هستید، عکس بارگذاری نشد؛ گزارش بدون عکس ثبت می‌شود");
+        } else {
+          const path = `${profile.farm_id}/${animalId}/${Date.now()}-${image.name}`;
+          const { error } = await supabase.storage.from("disease-images").upload(path, image);
+          if (error) {
+            console.error("[register/disease] image upload failed", error);
+            toast.warning("بارگذاری عکس ناموفق بود؛ گزارش بدون عکس ثبت می‌شود");
+          } else {
+            imageUrl = path;
+          }
+        }
       }
+
+      const payload = {
+        animal_id: animalId,
+        disease_type: diseaseType,
+        description: description || null,
+        image_url: imageUrl,
+        record_date: recordDate,
+      };
+
+      if (recordId) {
+        await updateRecord("disease_records", recordId, payload);
+        toast.success("بیماری به‌روزرسانی شد");
+      } else {
+        await createRecord("disease_records", profile.farm_id, session.user.id, payload);
+        toast.success("بیماری با موفقیت ثبت شد");
+      }
+      router.push("/register");
+    } catch (error) {
+      console.error("[register/disease] failed", error);
+      toast.error(error instanceof Error ? error.message : "ثبت بیماری با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setSubmitting(false);
     }
-
-    const payload = {
-      animal_id: animalId,
-      disease_type: diseaseType,
-      description: description || null,
-      image_url: imageUrl,
-      record_date: recordDate,
-    };
-
-    if (recordId) {
-      await updateRecord("disease_records", recordId, payload);
-      toast.success("بیماری به‌روزرسانی شد");
-    } else {
-      await createRecord("disease_records", profile.farm_id, session.user.id, payload);
-      toast.success("بیماری با موفقیت ثبت شد");
-    }
-
-    setSubmitting(false);
-    router.push("/register");
   }
 
   return (

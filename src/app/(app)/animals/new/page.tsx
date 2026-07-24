@@ -31,6 +31,7 @@ import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS, breedOptionsFor, DEFAULT_BREED } from "@/lib/animal-labels";
+import { todayIso } from "@/lib/jalali";
 import type { Species } from "@/lib/supabase/types";
 
 const SPECIES_OPTIONS = Object.keys(SPECIES_LABELS) as Species[];
@@ -39,9 +40,12 @@ const schema = z.object({
   ear_tag: z.string().min(1, "شماره پلاک گوش الزامی است"),
   name: z.string().optional(),
   species: z.enum(["sheep", "goat", "cattle", "camel", "horse"]),
-  animal_type: z.string().optional(),
+  animal_type: z.string().min(1, "انتخاب نوع و جنسیت دام الزامی است"),
   breed: z.string().optional(),
-  birth_date: z.string().optional(),
+  birth_date: z
+    .string()
+    .optional()
+    .refine((v) => !v || v <= todayIso(), { message: "تاریخ تولد نمی‌تواند در آینده باشد" }),
   notes: z.string().optional(),
 });
 
@@ -92,8 +96,12 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
   const breedOptions = breedOptionsFor(species);
 
   async function onSubmit(values: FormValues) {
-    if (!profile?.farm_id || !session) return;
+    if (!profile?.farm_id || !session) {
+      toast.error("جلسه کاربری معتبر نیست. لطفاً دوباره وارد شوید.");
+      return;
+    }
     setSubmitting(true);
+    console.log("[animals/new] submitting", { animalId, values });
 
     const selectedType = typeOptions.find((t) => t.value === values.animal_type);
 
@@ -108,28 +116,37 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
       notes: values.notes || null,
     };
 
-    if (animalId) {
-      await updateRecord("animals", animalId, payload);
-      toast.success("دام به‌روزرسانی شد");
-      router.push(`/animals/view?id=${animalId}`);
-    } else {
-      await createRecord("animals", profile.farm_id, session.user.id, {
-        ...payload,
-        father_id: null,
-        mother_id: null,
-        status: "active",
-        // Only animals auto-created from a birth record get a generated_id.
-        generated_id: null,
-        species_code: null,
-        birth_year: null,
-        offspring_number: null,
-        gender_code: null,
-      });
-      toast.success("دام با موفقیت ثبت شد");
-      router.push("/animals");
+    try {
+      if (animalId) {
+        await updateRecord("animals", animalId, payload);
+        console.log("[animals/new] update succeeded", animalId);
+        toast.success("دام به‌روزرسانی شد");
+        router.push(`/animals/view?id=${animalId}`);
+      } else {
+        const newId = await createRecord("animals", profile.farm_id, session.user.id, {
+          ...payload,
+          father_id: null,
+          mother_id: null,
+          status: "active",
+          // Only animals auto-created from a birth record get a generated_id.
+          generated_id: null,
+          species_code: null,
+          birth_year: null,
+          offspring_number: null,
+          gender_code: null,
+        });
+        console.log("[animals/new] create succeeded", newId);
+        toast.success("دام با موفقیت ثبت شد");
+        router.push("/animals");
+      }
+    } catch (error) {
+      console.error("[animals/new] registration failed", error);
+      toast.error(
+        error instanceof Error ? error.message : "ثبت دام با خطا مواجه شد. لطفاً دوباره تلاش کنید."
+      );
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
   }
 
   return (

@@ -41,6 +41,7 @@ function WeightForm({ recordId }: { recordId: string | null }) {
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
     setSubmitting(true);
+    console.log("[register/weight] submitting", { recordId, animalId, weight, recordDate });
 
     const payload = {
       animal_id: animalId,
@@ -48,16 +49,21 @@ function WeightForm({ recordId }: { recordId: string | null }) {
       record_date: recordDate,
     };
 
-    if (recordId) {
-      await updateRecord("weight_records", recordId, payload);
-      toast.success("وزن به‌روزرسانی شد");
-    } else {
-      await createRecord("weight_records", profile.farm_id, session.user.id, payload);
-      toast.success("وزن با موفقیت ثبت شد");
+    try {
+      if (recordId) {
+        await updateRecord("weight_records", recordId, payload);
+        toast.success("وزن به‌روزرسانی شد");
+      } else {
+        await createRecord("weight_records", profile.farm_id, session.user.id, payload);
+        toast.success("وزن با موفقیت ثبت شد");
+      }
+      router.push("/register");
+    } catch (error) {
+      console.error("[register/weight] failed", error);
+      toast.error(error instanceof Error ? error.message : "ثبت وزن با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
-    router.push("/register");
   }
 
   return (

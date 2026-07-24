@@ -40,6 +40,7 @@ function MilkForm({ recordId }: { recordId: string | null }) {
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
     setSubmitting(true);
+    console.log("[register/milk] submitting", { recordId, animalId, morning, evening, recordDate });
 
     const payload = {
       animal_id: animalId,
@@ -48,16 +49,21 @@ function MilkForm({ recordId }: { recordId: string | null }) {
       record_date: recordDate,
     };
 
-    if (recordId) {
-      await updateRecord("milk_records", recordId, payload);
-      toast.success("شیر به‌روزرسانی شد");
-    } else {
-      await createRecord("milk_records", profile.farm_id, session.user.id, payload);
-      toast.success("شیر با موفقیت ثبت شد");
+    try {
+      if (recordId) {
+        await updateRecord("milk_records", recordId, payload);
+        toast.success("شیر به‌روزرسانی شد");
+      } else {
+        await createRecord("milk_records", profile.farm_id, session.user.id, payload);
+        toast.success("شیر با موفقیت ثبت شد");
+      }
+      router.push("/register");
+    } catch (error) {
+      console.error("[register/milk] failed", error);
+      toast.error(error instanceof Error ? error.message : "ثبت شیر با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
-    router.push("/register");
   }
 
   return (

@@ -113,82 +113,89 @@ function BirthForm({ recordId }: { recordId: string | null }) {
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
     setSubmitting(true);
+    console.log("[register/birth] submitting", { recordId, motherId, fatherId, maleCount, femaleCount, birthDate });
 
     const maleN = Number(maleCount) || 0;
     const femaleN = Number(femaleCount) || 0;
 
-    if (recordId) {
-      await updateRecord("birth_records", recordId, {
+    try {
+      if (recordId) {
+        await updateRecord("birth_records", recordId, {
+          mother_id: motherId,
+          father_id: fatherId || null,
+          male_offspring_count: maleN,
+          female_offspring_count: femaleN,
+          birth_date: birthDate,
+          notes: notes || null,
+        });
+        toast.success("زایمان به‌روزرسانی شد");
+        router.push("/register");
+        return;
+      }
+
+      // Auto-create one animal record per offspring, each with an automatic
+      // SPECIES-MOTHERID-YEAR-GENDER+NUMBER ID (e.g. "SH-125-05-M1") used as
+      // its ear tag — the farmer can still rename it later like any ear tag.
+      const generatedIds: string[] = [];
+      if (mother) {
+        const maleType = juvenileAnimalType(mother.species, "male");
+        const femaleType = juvenileAnimalType(mother.species, "female");
+        const birthYear = jalaliYearSuffix(birthDate);
+        const jobs: Promise<unknown>[] = [];
+
+        for (const [genderCode, count, gender, type] of [
+          [GENDER_CODE.male, maleN, "male", maleType] as const,
+          [GENDER_CODE.female, femaleN, "female", femaleType] as const,
+        ]) {
+          if (count === 0) continue;
+          const existingMax = await existingMaxOffspringNumber(profile.farm_id, motherId, birthYear, genderCode);
+          for (const offspringNumber of nextOffspringNumbers(existingMax, count)) {
+            const generatedId = buildGeneratedId(mother.species, mother.ear_tag, birthYear, genderCode, offspringNumber);
+            generatedIds.push(generatedId);
+            jobs.push(
+              createRecord("animals", profile.farm_id, session.user.id, {
+                ear_tag: generatedId,
+                name: null,
+                species: mother.species,
+                animal_type: type.value,
+                breed: mother.breed,
+                gender,
+                birth_date: birthDate,
+                father_id: fatherId || null,
+                mother_id: motherId,
+                status: "active",
+                notes: null,
+                generated_id: generatedId,
+                species_code: SPECIES_CODE[mother.species],
+                birth_year: birthYear,
+                offspring_number: offspringNumber,
+                gender_code: genderCode,
+              })
+            );
+          }
+        }
+        await Promise.all(jobs);
+      }
+
+      await createRecord("birth_records", profile.farm_id, session.user.id, {
         mother_id: motherId,
         father_id: fatherId || null,
         male_offspring_count: maleN,
         female_offspring_count: femaleN,
         birth_date: birthDate,
         notes: notes || null,
+        offspring_generated_ids: generatedIds,
       });
-      toast.success("زایمان به‌روزرسانی شد");
-      setSubmitting(false);
+
+      console.log("[register/birth] created offspring", generatedIds);
+      toast.success(`زایمان و ${toPersianDigits(total)} نوزاد با موفقیت ثبت شد`);
       router.push("/register");
-      return;
+    } catch (error) {
+      console.error("[register/birth] failed", error);
+      toast.error(error instanceof Error ? error.message : "ثبت زایمان با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setSubmitting(false);
     }
-
-    // Auto-create one animal record per offspring, each with an automatic
-    // SPECIES-MOTHERID-YEAR-GENDER+NUMBER ID (e.g. "SH-125-05-M1") used as
-    // its ear tag — the farmer can still rename it later like any ear tag.
-    const generatedIds: string[] = [];
-    if (mother) {
-      const maleType = juvenileAnimalType(mother.species, "male");
-      const femaleType = juvenileAnimalType(mother.species, "female");
-      const birthYear = jalaliYearSuffix(birthDate);
-      const jobs: Promise<unknown>[] = [];
-
-      for (const [genderCode, count, gender, type] of [
-        [GENDER_CODE.male, maleN, "male", maleType] as const,
-        [GENDER_CODE.female, femaleN, "female", femaleType] as const,
-      ]) {
-        if (count === 0) continue;
-        const existingMax = await existingMaxOffspringNumber(profile.farm_id, motherId, birthYear, genderCode);
-        for (const offspringNumber of nextOffspringNumbers(existingMax, count)) {
-          const generatedId = buildGeneratedId(mother.species, mother.ear_tag, birthYear, genderCode, offspringNumber);
-          generatedIds.push(generatedId);
-          jobs.push(
-            createRecord("animals", profile.farm_id, session.user.id, {
-              ear_tag: generatedId,
-              name: null,
-              species: mother.species,
-              animal_type: type.value,
-              breed: mother.breed,
-              gender,
-              birth_date: birthDate,
-              father_id: fatherId || null,
-              mother_id: motherId,
-              status: "active",
-              notes: null,
-              generated_id: generatedId,
-              species_code: SPECIES_CODE[mother.species],
-              birth_year: birthYear,
-              offspring_number: offspringNumber,
-              gender_code: genderCode,
-            })
-          );
-        }
-      }
-      await Promise.all(jobs);
-    }
-
-    await createRecord("birth_records", profile.farm_id, session.user.id, {
-      mother_id: motherId,
-      father_id: fatherId || null,
-      male_offspring_count: maleN,
-      female_offspring_count: femaleN,
-      birth_date: birthDate,
-      notes: notes || null,
-      offspring_generated_ids: generatedIds,
-    });
-
-    setSubmitting(false);
-    toast.success(`زایمان و ${toPersianDigits(total)} نوزاد با موفقیت ثبت شد`);
-    router.push("/register");
   }
 
   return (
