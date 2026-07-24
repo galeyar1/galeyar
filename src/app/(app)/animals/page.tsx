@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Plus, Clock, Search, SlidersHorizontal, Pencil } from "lucide-react";
+import { Plus, Clock, Search, SlidersHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -18,12 +18,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DeleteIconButton } from "@/components/confirm-dialog";
-import { softDeleteRecord } from "@/lib/sync/repository";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { updateRecord } from "@/lib/sync/repository";
 import { SPECIES_LABELS, ANIMAL_STATUS_LABELS, effectiveAnimalTypeLabel, ageInYears } from "@/lib/animal-labels";
+import { EXIT_REASON_LABELS, statusForExitReason } from "@/lib/exit-reasons";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
 import type { Local } from "@/lib/db/schema";
-import type { Species, AnimalStatus, Animal } from "@/lib/supabase/types";
+import type { Species, AnimalStatus, Animal, ExitReason } from "@/lib/supabase/types";
 
 const SPECIES_ORDER: Species[] = ["sheep", "goat", "cattle", "camel", "horse"];
 
@@ -107,8 +115,20 @@ export default function AnimalsPage() {
     return map;
   }, [filtered]);
 
-  async function handleDelete(id: string) {
-    await softDeleteRecord("animals", id);
+  const [exitAnimal, setExitAnimal] = useState<Local<Animal> | null>(null);
+  const [exitReason, setExitReason] = useState<ExitReason>("sale");
+  const [exiting, setExiting] = useState(false);
+
+  async function confirmExit() {
+    if (!exitAnimal) return;
+    setExiting(true);
+    await updateRecord("animals", exitAnimal.id, {
+      status: statusForExitReason(exitReason),
+      exit_reason: exitReason,
+      deleted_at: new Date().toISOString(),
+    });
+    setExiting(false);
+    setExitAnimal(null);
   }
 
   return (
@@ -257,10 +277,19 @@ export default function AnimalsPage() {
                         </Button>
                       )}
                       {canDelete && (
-                        <DeleteIconButton
-                          onDelete={() => handleDelete(animal.id)}
-                          description={`آیا از حذف ${animal.ear_tag} مطمئن هستید؟`}
-                        />
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="حذف"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setExitReason("sale");
+                            setExitAnimal(animal);
+                          }}
+                        >
+                          <Trash2 className="size-4 text-destructive" />
+                        </Button>
                       )}
                     </div>
                   </li>
@@ -270,6 +299,32 @@ export default function AnimalsPage() {
           );
         })}
       </div>
+
+      <Dialog open={!!exitAnimal} onOpenChange={(open) => !open && setExitAnimal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>حذف {exitAnimal?.ear_tag}</DialogTitle>
+            <DialogDescription>
+              دلیل خروج این دام از گله را انتخاب کنید. این عملیات قابل بازگشت نیست.
+            </DialogDescription>
+          </DialogHeader>
+          <Select value={exitReason} onValueChange={(v) => setExitReason(v as ExitReason)}>
+            <SelectTrigger className="h-12 w-full text-lg"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(Object.keys(EXIT_REASON_LABELS) as ExitReason[]).map((r) => (
+                <SelectItem key={r} value={r}>{EXIT_REASON_LABELS[r]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExitAnimal(null)} disabled={exiting}>انصراف</Button>
+            <Button variant="destructive" onClick={confirmExit} disabled={exiting}>
+              <Trash2 className="size-4" />
+              {exiting ? "در حال حذف…" : "حذف"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

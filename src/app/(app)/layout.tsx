@@ -49,6 +49,7 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
     { href: "/pedigree", label: "شجره‌نامه", icon: GitBranch },
     { href: "/register", label: "ثبت درمان", icon: ClipboardPlus },
     { href: "/history", label: "تاریخچه", icon: History },
+    { href: "/ai", label: "دستیار", icon: Sparkles },
   ],
   consultant: [
     { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
@@ -70,11 +71,18 @@ const PAGE_TITLES: Record<string, string> = {
   "/settings": "تنظیمات",
   "/feed": "مدیریت خوراک",
   "/reports": "گزارش‌ها و تحلیل",
-  "/ai": "دستیار هوشمند",
   "/farms": "مزرعه‌های من",
   "/farms/new": "ساخت مزرعه جدید",
   "/pedigree/view": "شجره‌نامه",
   "/register/vaccination": "ثبت واکسیناسیون",
+  "/register/deworming": "ثبت ضد انگل",
+  "/ai/pregnancy": "دستیار آبستنی",
+  "/ai/feed": "دستیار خوراک و جیره",
+  "/ai/disease": "دستیار بیماری",
+  "/ai/vaccination": "دستیار واکسیناسیون",
+  "/ai/deworming": "دستیار ضد انگل",
+  "/ai/herd-growth": "دستیار رشد گله",
+  "/ai/genetics": "دستیار ژنتیک",
 };
 
 /** Breadcrumb trail for nested pages — the back button covers "go one step back", this covers "where am I". */
@@ -88,11 +96,19 @@ const BREADCRUMBS: Record<string, { label: string; href: string }[]> = {
   "/register/birth": [{ label: "ثبت", href: "/register" }],
   "/register/treatment": [{ label: "ثبت", href: "/register" }],
   "/register/vaccination": [{ label: "ثبت", href: "/register" }],
+  "/register/deworming": [{ label: "ثبت", href: "/register" }],
   "/farms/new": [{ label: "مزرعه‌های من", href: "/farms" }],
+  "/ai/pregnancy": [{ label: "دستیار هوشمند", href: "/ai" }],
+  "/ai/feed": [{ label: "دستیار هوشمند", href: "/ai" }],
+  "/ai/disease": [{ label: "دستیار هوشمند", href: "/ai" }],
+  "/ai/vaccination": [{ label: "دستیار هوشمند", href: "/ai" }],
+  "/ai/deworming": [{ label: "دستیار هوشمند", href: "/ai" }],
+  "/ai/herd-growth": [{ label: "دستیار هوشمند", href: "/ai" }],
+  "/ai/genetics": [{ label: "دستیار هوشمند", href: "/ai" }],
 };
 
 /** Routes that show the brand mark + settings gear instead of a back button — the roots of each bottom-nav tab. */
-const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/pedigree", "/register", "/history", "/home"]);
+const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/pedigree", "/register", "/history", "/home", "/ai"]);
 
 /**
  * Fallback destination when there's no browser history to go back to — e.g.
@@ -111,11 +127,18 @@ const BACK_FALLBACK: Record<string, string> = {
   "/settings": "/dashboard",
   "/feed": "/dashboard",
   "/reports": "/dashboard",
-  "/ai": "/dashboard",
   "/farms": "/dashboard",
   "/farms/new": "/farms",
   "/pedigree/view": "/pedigree",
   "/register/vaccination": "/register",
+  "/register/deworming": "/register",
+  "/ai/pregnancy": "/ai",
+  "/ai/feed": "/ai",
+  "/ai/disease": "/ai",
+  "/ai/vaccination": "/ai",
+  "/ai/deworming": "/ai",
+  "/ai/herd-growth": "/ai",
+  "/ai/genetics": "/ai",
 };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

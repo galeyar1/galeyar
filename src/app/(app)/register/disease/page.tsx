@@ -17,11 +17,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AnimalPicker } from "@/components/animal-picker";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { supabase } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/jalali";
+import { feverAlertLevel, suggestedQuarantineDays } from "@/lib/disease-alerts";
 import type { DiseaseType } from "@/lib/supabase/types";
 
 const DISEASE_LABELS: Record<DiseaseType, string> = {
@@ -41,6 +44,9 @@ function DiseaseForm({ recordId }: { recordId: string | null }) {
   const [description, setDescription] = useState("");
   const [recordDate, setRecordDate] = useState(todayIso());
   const [image, setImage] = useState<File | null>(null);
+  const [bodyTemperature, setBodyTemperature] = useState("");
+  const [quarantine, setQuarantine] = useState(false);
+  const [quarantineUntil, setQuarantineUntil] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const existing = useLiveQuery(() => (recordId ? db.disease_records.get(recordId) : undefined), [recordId]);
@@ -51,10 +57,25 @@ function DiseaseForm({ recordId }: { recordId: string | null }) {
       setDiseaseType(existing.disease_type);
       setDescription(existing.description ?? "");
       setRecordDate(existing.record_date);
+      setBodyTemperature(existing.body_temperature?.toString() ?? "");
+      setQuarantine(!!existing.quarantine_until);
+      setQuarantineUntil(existing.quarantine_until ?? "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing?.id]);
 
+  // Suggest a quarantine end date once the farmer turns quarantine on, based
+  // on the disease type — they can still override the date freely.
+  useEffect(() => {
+    if (!quarantine || quarantineUntil) return;
+    const suggestedDays = suggestedQuarantineDays(diseaseType) ?? 14;
+    const d = new Date(recordDate);
+    d.setDate(d.getDate() + suggestedDays);
+    setQuarantineUntil(d.toISOString().slice(0, 10));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quarantine]);
+
+  const feverLevel = feverAlertLevel(bodyTemperature ? Number(bodyTemperature) : null);
   const canSubmit = animalId && diseaseType;
 
   async function onSubmit() {
@@ -85,6 +106,8 @@ function DiseaseForm({ recordId }: { recordId: string | null }) {
         description: description || null,
         image_url: imageUrl,
         record_date: recordDate,
+        body_temperature: bodyTemperature ? Number(bodyTemperature) : null,
+        quarantine_until: quarantine ? quarantineUntil || null : null,
       };
 
       if (recordId) {
@@ -132,6 +155,39 @@ function DiseaseForm({ recordId }: { recordId: string | null }) {
         <label className="text-base">تاریخ</label>
         <PersianDatePicker value={recordDate} onChange={(iso) => setRecordDate(iso ?? todayIso())} className="h-12 text-lg" />
       </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-base">دمای بدن (اختیاری، سانتی‌گراد)</label>
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          placeholder="مثلاً ۳۹.۲"
+          value={bodyTemperature}
+          onChange={(e) => setBodyTemperature(e.target.value)}
+          className="h-12 text-lg"
+        />
+        {feverLevel && (
+          <p className={feverLevel === "emergency" ? "text-sm font-semibold text-destructive" : "text-sm text-warning"}>
+            {feverLevel === "emergency" ? "هشدار اورژانسی: تب بسیار بالا" : "هشدار: تب بالاتر از حد طبیعی"}
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl bg-muted p-3">
+        <span>قرنطینه</span>
+        <Switch checked={quarantine} onCheckedChange={setQuarantine} />
+      </div>
+      {quarantine && (
+        <div className="flex flex-col gap-2">
+          <label className="text-base">پایان قرنطینه</label>
+          <PersianDatePicker
+            value={quarantineUntil}
+            onChange={(iso) => setQuarantineUntil(iso ?? "")}
+            className="h-12 text-lg"
+          />
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <label className="text-base">یادداشت</label>

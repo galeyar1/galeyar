@@ -2,7 +2,7 @@ import * as jalaali from "jalaali-js";
 
 const PERSIAN_DIGITS = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
 
-const JALALI_MONTHS = [
+export const JALALI_MONTHS = [
   "فروردین",
   "اردیبهشت",
   "خرداد",

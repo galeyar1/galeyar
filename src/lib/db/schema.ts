@@ -2,6 +2,7 @@ import Dexie, { type Table } from "dexie";
 import type {
   Animal,
   BirthRecord,
+  Deworming,
   DiseaseRecord,
   MilkRecord,
   SyncableTable,
@@ -48,6 +49,7 @@ class GaleyarDatabase extends Dexie {
   birth_records!: Table<Local<BirthRecord>, string>;
   treatments!: Table<Local<Treatment>, string>;
   vaccinations!: Table<Local<Vaccination>, string>;
+  deworming_records!: Table<Local<Deworming>, string>;
   sync_queue!: Table<SyncQueueItem, number>;
   sync_meta!: Table<SyncMeta, string>;
   profile!: Table<CachedProfile, string>;
@@ -78,6 +80,10 @@ class GaleyarDatabase extends Dexie {
         // sync does one full re-pull instead of carrying a mismatched key.
         await tx.table("sync_meta").clear();
       });
+
+    this.version(3).stores({
+      deworming_records: "id, farm_id, animal_id, next_due_date, sync_status, deleted_at",
+    });
   }
 }
 

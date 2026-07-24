@@ -22,12 +22,28 @@ export type FeedType =
   | "custom";
 export type FeedUnit = "kg" | "ton" | "bag";
 export type NotificationType = "feed_low" | "disease_alert" | "ai_suggestion" | "system";
+export type DewormingType = "internal" | "external";
+export type ExitReason =
+  | "sale"
+  | "slaughterhouse"
+  | "disease_death"
+  | "accident"
+  | "genetic_removal"
+  | "old_age"
+  | "infertility"
+  | "abortion"
+  | "missing"
+  | "donation"
+  | "other";
 
 export interface Farm {
   id: string;
   farm_name: string;
   province: string | null;
   city: string | null;
+  /** Herd-growth assumption overrides (src/lib/herd-growth.ts) — null uses the species/breed default. */
+  twin_rate: number | null;
+  mortality_rate: number | null;
   created_at: string;
 }
 
@@ -71,6 +87,12 @@ export interface Animal {
   birth_year: string | null;
   offspring_number: number | null;
   gender_code: string | null;
+  /** Pregnancy Assistant (src/lib/pregnancy.ts). */
+  is_pregnant: boolean;
+  pregnancy_month: number | null;
+  expected_birth_date: string | null;
+  /** Set when status leaves "active" — src/lib/exit-reasons.ts. */
+  exit_reason: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -110,6 +132,9 @@ export interface DiseaseRecord {
   description: string | null;
   image_url: string | null;
   record_date: string;
+  /** °C, optional — src/lib/disease-alerts.ts fever thresholds. */
+  body_temperature: number | null;
+  quarantine_until: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -154,6 +179,8 @@ export interface FeedInventory {
   quantity: number;
   unit: FeedUnit;
   unit_cost: number | null;
+  /** Set once by the farmer instead of logging consumption daily — src/lib/feed-forecast.ts. */
+  daily_rate: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -217,6 +244,21 @@ export interface Vaccination {
   deleted_at: string | null;
 }
 
+export interface Deworming {
+  id: string;
+  farm_id: string;
+  animal_id: string;
+  deworming_type: DewormingType;
+  product_name: string;
+  date_given: string;
+  next_due_date: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
 export type PedigreeRelationType = "father" | "mother";
 
 export interface PedigreeRelation {
@@ -238,4 +280,5 @@ export type SyncableTable =
   | "disease_records"
   | "birth_records"
   | "treatments"
-  | "vaccinations";
+  | "vaccinations"
+  | "deworming_records";
