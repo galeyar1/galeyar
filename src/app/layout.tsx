@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Vazirmatn } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import { PwaRegister } from "@/components/pwa-register";
 import { SyncInit } from "@/components/sync-init";
 import { AuthProvider } from "@/lib/auth/auth-provider";
@@ -52,14 +53,17 @@ export default function RootLayout({
       lang="fa"
       dir="rtl"
       className={`${vazirmatn.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          {children}
-          <PwaRegister />
-          <SyncInit />
-          <Toaster position="top-center" />
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
+            {children}
+            <PwaRegister />
+            <SyncInit />
+            <Toaster position="top-center" />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -23,6 +23,7 @@ import { Logo } from "@/components/logo";
 import { FarmSwitcher } from "@/components/farm-switcher";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
 import { AnimalNavIcon } from "@/components/animal-nav-icon";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { UserRole } from "@/lib/supabase/types";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
@@ -172,11 +173,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="text-base font-bold">{title ?? "گله‌یار"}</span>
             </span>
           )}
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/settings">
-              <Settings className="size-5" />
-            </Link>
-          </Button>
+          <span className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/settings">
+                <Settings className="size-5" />
+              </Link>
+            </Button>
+          </span>
         </div>
 
         {breadcrumbs && (
