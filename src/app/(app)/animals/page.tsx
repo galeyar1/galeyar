@@ -38,10 +38,27 @@ import {
 } from "@/lib/animal-labels";
 import { EXIT_REASON_LABELS, statusForExitReason } from "@/lib/exit-reasons";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
+import { GENETIC_STATE_LABELS, type GeneticState } from "@/lib/genetics-prediction";
 import type { Local } from "@/lib/db/schema";
 import type { Species, AnimalStatus, Animal, ExitReason } from "@/lib/supabase/types";
 
 const SPECIES_ORDER: Species[] = ["sheep", "goat", "cattle", "camel", "horse"];
+
+// Only the states spec section 15 asks to filter by — "unknown"/"other"
+// animals are reached via the "همه" (all) option instead.
+const GENETICS_FILTER_OPTIONS: GeneticState[] = [
+  "homozygous",
+  "heterozygous",
+  "local",
+  "romanov",
+  "romanov_asaf",
+  "shall_romanov",
+  "lacaune",
+];
+
+function effectiveGeneticsOf(a: Local<Animal>): GeneticState | null {
+  return ((a.confirmed_genetics ?? a.predicted_genetics ?? null) as GeneticState | null) || null;
+}
 
 type AgeBucket = "all" | "young" | "adult" | "mature";
 
@@ -72,6 +89,7 @@ function AnimalsPageContent() {
   const [breedFilter, setBreedFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<AnimalStatus | "all">("all");
   const [ageFilter, setAgeFilter] = useState<AgeBucket>("all");
+  const [geneticsFilter, setGeneticsFilter] = useState<GeneticState | "all">("all");
 
   const animals = useLiveQuery(async () => {
     if (!farmId) return [];
@@ -111,6 +129,7 @@ function AnimalsPageContent() {
       if (breedFilter !== "all" && a.breed !== breedFilter) return false;
       if (statusFilter !== "all" && a.status !== statusFilter) return false;
       if (!matchesAge(ageFilter, ageInYears(a.birth_date))) return false;
+      if (geneticsFilter !== "all" && effectiveGeneticsOf(a) !== geneticsFilter) return false;
       if (typeFilter) {
         const gender = a.gender === "male" || a.gender === "female" ? a.gender : null;
         const effective = effectiveAnimalType(a.species, gender, a.birth_date);
@@ -118,7 +137,7 @@ function AnimalsPageContent() {
       }
       return true;
     });
-  }, [animals, query, earTagOf, speciesFilter, genderFilter, breedFilter, statusFilter, ageFilter, typeFilter]);
+  }, [animals, query, earTagOf, speciesFilter, genderFilter, breedFilter, statusFilter, ageFilter, geneticsFilter, typeFilter]);
 
   const summary = useMemo(() => {
     const counts: Record<string, number> = { total: (animals ?? []).length };
@@ -260,12 +279,22 @@ function AnimalsPageContent() {
           </Select>
 
           <Select value={ageFilter} onValueChange={(v) => setAgeFilter(v as AgeBucket)}>
-            <SelectTrigger className="col-span-2 h-10"><SelectValue placeholder="سن" /></SelectTrigger>
+            <SelectTrigger className="h-10"><SelectValue placeholder="سن" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">همه سنین</SelectItem>
               <SelectItem value="young">زیر ۱ سال (نوزاد/بره)</SelectItem>
               <SelectItem value="adult">۱ تا ۳ سال</SelectItem>
               <SelectItem value="mature">بیشتر از ۳ سال</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={geneticsFilter} onValueChange={(v) => setGeneticsFilter(v as GeneticState | "all")}>
+            <SelectTrigger className="h-10"><SelectValue placeholder="ژنتیک" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه ژنتیک‌ها</SelectItem>
+              {GENETICS_FILTER_OPTIONS.map((g) => (
+                <SelectItem key={g} value={g}>{GENETIC_STATE_LABELS[g]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

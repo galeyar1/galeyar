@@ -5,6 +5,7 @@ import type {
   Deworming,
   DiseaseRecord,
   FinancialTransaction,
+  GeneticTest,
   MilkRecord,
   SupportTicket,
   SyncableTable,
@@ -54,6 +55,7 @@ class GaleyarDatabase extends Dexie {
   deworming_records!: Table<Local<Deworming>, string>;
   financial_transactions!: Table<Local<FinancialTransaction>, string>;
   support_tickets!: Table<Local<SupportTicket>, string>;
+  genetic_tests!: Table<Local<GeneticTest>, string>;
   sync_queue!: Table<SyncQueueItem, number>;
   sync_meta!: Table<SyncMeta, string>;
   profile!: Table<CachedProfile, string>;
@@ -92,6 +94,10 @@ class GaleyarDatabase extends Dexie {
     this.version(4).stores({
       financial_transactions: "id, farm_id, type, transaction_date, animal_id, sync_status, deleted_at",
       support_tickets: "id, farm_id, status, sync_status, deleted_at",
+    });
+
+    this.version(5).stores({
+      genetic_tests: "id, farm_id, animal_id, test_date, sync_status, deleted_at",
     });
   }
 }

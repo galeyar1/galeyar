@@ -24,7 +24,15 @@ import {
   offspringTitle,
 } from "@/lib/offspring-id";
 import { inbreedingWarning } from "@/lib/pedigree-ai";
+import { predictAndSampleOffspringGenetics, geneticScore, type GeneticState } from "@/lib/genetics-prediction";
 import type { PedigreeAnimal } from "@/lib/pedigree";
+import type { Local } from "@/lib/db/schema";
+import type { Animal } from "@/lib/supabase/types";
+
+/** The parent's best-known genetic state for prediction purposes: a lab/user-confirmed value if one exists, else the parent's own prediction, else "unknown". */
+function parentGeneticState(animal: Local<Animal> | undefined): GeneticState {
+  return ((animal?.confirmed_genetics ?? animal?.predicted_genetics ?? "unknown") as GeneticState) || "unknown";
+}
 
 /** Highest offspring_number already used for this mother+year+gender, or 0 if none — so a second litter the same year keeps numbering instead of colliding. */
 async function existingMaxOffspringNumber(
@@ -143,6 +151,13 @@ function BirthForm({ recordId }: { recordId: string | null }) {
         const birthYear = jalaliYearSuffix(birthDate);
         const jobs: Promise<unknown>[] = [];
 
+        // Each offspring's predicted_genetics is an independent random draw
+        // from the parents' cross distribution (src/lib/genetics-prediction.ts)
+        // — not the same fixed value for every sibling — so twins can predict
+        // differently, same as the spec's own worked example.
+        const fatherState = parentGeneticState(father);
+        const motherState = parentGeneticState(mother);
+
         for (const [genderCode, count, gender, type] of [
           [GENDER_CODE.male, maleN, "male", maleType] as const,
           [GENDER_CODE.female, femaleN, "female", femaleType] as const,
@@ -152,6 +167,7 @@ function BirthForm({ recordId }: { recordId: string | null }) {
           for (const offspringNumber of nextOffspringNumbers(existingMax, count)) {
             const generatedId = buildGeneratedId(mother.species, mother.ear_tag, birthYear, genderCode, offspringNumber);
             generatedIds.push(generatedId);
+            const predictedGenetics = predictAndSampleOffspringGenetics(fatherState, motherState);
             jobs.push(
               createRecord("animals", profile.farm_id, session.user.id, {
                 ear_tag: generatedId,
@@ -170,6 +186,10 @@ function BirthForm({ recordId }: { recordId: string | null }) {
                 birth_year: birthYear,
                 offspring_number: offspringNumber,
                 gender_code: genderCode,
+                predicted_genetics: predictedGenetics,
+                confirmed_genetics: null,
+                genetics_source: "ai_prediction",
+                genetic_score: geneticScore(predictedGenetics),
               })
             );
           }

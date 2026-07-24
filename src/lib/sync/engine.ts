@@ -14,6 +14,7 @@ const SYNC_TABLES: SyncableTable[] = [
   "deworming_records",
   "financial_transactions",
   "support_tickets",
+  "genetic_tests",
 ];
 
 let syncing = false;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Milk, Weight, Stethoscope, Baby, Pill, Syringe, Bug, Wallet } from "lucide-react";
+import { Milk, Weight, Stethoscope, Baby, Pill, Syringe, Bug, Wallet, FlaskConical } from "lucide-react";
 import { AnimalNavIcon } from "@/components/animal-nav-icon";
 
 const ITEMS: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
@@ -13,6 +13,7 @@ const ITEMS: { href: string; label: string; icon: React.ComponentType<{ classNam
   { href: "/register/vaccination", label: "ثبت واکسیناسیون", icon: Syringe, color: "text-success" },
   { href: "/register/deworming", label: "ثبت ضد انگل", icon: Bug, color: "text-success" },
   { href: "/register/finance", label: "ثبت تراکنش مالی", icon: Wallet, color: "text-primary" },
+  { href: "/register/genetic-test", label: "ثبت آزمایش ژنتیک", icon: FlaskConical, color: "text-primary" },
   { href: "/animals/new", label: "ثبت دام جدید", icon: AnimalNavIcon, color: "text-primary" },
 ];
 

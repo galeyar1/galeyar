@@ -107,6 +107,11 @@ export interface Animal {
   expected_birth_date: string | null;
   /** Set when status leaves "active" — src/lib/exit-reasons.ts. */
   exit_reason: string | null;
+  /** Genetic Intelligence (src/lib/genetics-prediction.ts). */
+  predicted_genetics: string | null;
+  confirmed_genetics: string | null;
+  genetics_source: string | null;
+  genetic_score: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -316,6 +321,32 @@ export interface SupportTicketMessage {
   created_at: string;
 }
 
+export interface GeneticTest {
+  id: string;
+  farm_id: string;
+  animal_id: string;
+  laboratory_name: string;
+  test_date: string;
+  result: string;
+  attachment_url: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface GeneticsHistoryEntry {
+  id: string;
+  farm_id: string;
+  animal_id: string;
+  previous_confirmed: string | null;
+  new_confirmed: string;
+  source: string;
+  changed_by: string | null;
+  changed_at: string;
+}
+
 export type PedigreeRelationType = "father" | "mother";
 
 export interface PedigreeRelation {
@@ -340,4 +371,5 @@ export type SyncableTable =
   | "vaccinations"
   | "deworming_records"
   | "financial_transactions"
-  | "support_tickets";
+  | "support_tickets"
+  | "genetic_tests";

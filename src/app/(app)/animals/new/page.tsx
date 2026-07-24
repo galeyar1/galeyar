@@ -158,12 +158,17 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
           father_id: null,
           mother_id: null,
           status: "active",
-          // Only animals auto-created from a birth record get a generated_id.
+          // Only animals auto-created from a birth record get a generated_id
+          // or a predicted genetics value.
           generated_id: null,
           species_code: null,
           birth_year: null,
           offspring_number: null,
           gender_code: null,
+          predicted_genetics: null,
+          confirmed_genetics: null,
+          genetics_source: null,
+          genetic_score: null,
         });
         console.log("[animals/new] create succeeded", newId);
         toast.success("دام با موفقیت ثبت شد");
