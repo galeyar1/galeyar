@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -11,34 +11,36 @@ import {
   Sparkles,
   Settings,
   Home as HomeIcon,
-  Wheat,
   ArrowRight,
   Briefcase,
+  Menu,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/logo";
 import { FarmSwitcher } from "@/components/farm-switcher";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
 import { AnimalNavIcon } from "@/components/animal-nav-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { BOTTOM_NAVIGATION, HAMBURGER_MENU } from "@/lib/navigation-rules";
 import type { UserRole } from "@/lib/supabase/types";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
-/** Bottom nav is role-scoped per the spec's separate Manager/Operator/Vet/Consultant navigation. */
+/**
+ * Bottom nav is role-scoped per the spec's separate Manager/Operator/Vet/
+ * Consultant navigation. Owner's list is the general-purpose one and is
+ * capped at 5 items per src/lib/navigation-rules.ts (the permanent design
+ * standard) — everything else owners need lives in the hamburger drawer.
+ * The other roles' lists are already well under the 5-item cap and are
+ * role-specific subsets outside that rule's scope.
+ */
 const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
-  owner: [
-    { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
-    { href: "/animals", label: "دام‌ها", icon: AnimalNavIcon },
-    { href: "/register", label: "ثبت", icon: ClipboardPlus },
-    { href: "/feed", label: "خوراک", icon: Wheat },
-    { href: "/reports", label: "گزارش", icon: BarChart3 },
-    { href: "/ai", label: "دستیار", icon: Sparkles },
-    { href: "/business", label: "کسب‌وکار", icon: Briefcase },
-  ],
+  owner: BOTTOM_NAVIGATION,
   operator: [
     { href: "/home", label: "خانه", icon: HomeIcon },
     { href: "/register", label: "ثبت", icon: ClipboardPlus },
@@ -133,7 +135,16 @@ const BREADCRUMBS: Record<string, { label: string; href: string }[]> = {
 };
 
 /** Routes that show the brand mark + settings gear instead of a back button — the roots of each bottom-nav tab. */
-const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/register", "/history", "/home", "/ai", "/business"]);
+const TOP_LEVEL_PATHS = new Set([
+  "/dashboard",
+  "/animals",
+  "/register",
+  "/history",
+  "/home",
+  "/ai",
+  "/business",
+  "/settings",
+]);
 
 /**
  * Fallback destination when there's no browser history to go back to — e.g.
@@ -183,6 +194,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { session, profile, loading } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -194,6 +206,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/onboarding/farm");
     }
   }, [loading, session, profile, router]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   if (loading || !session || !profile?.farm_id) {
     return (
@@ -220,21 +236,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-background">
       <header className="flex flex-col gap-1 border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMenuOpen(true)}
+            aria-label="باز کردن منو"
+          >
+            <Menu className="size-5" />
+          </Button>
+
           {isTopLevel ? (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center justify-center gap-2 overflow-hidden">
               <Logo size={28} />
               <span className="text-lg font-bold text-primary">گله‌یار</span>
             </span>
           ) : (
-            <span className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={goBack} aria-label="بازگشت">
+            <span className="flex items-center gap-2 overflow-hidden">
+              <Button variant="ghost" size="icon" onClick={goBack} aria-label="بازگشت" className="shrink-0">
                 <ArrowRight className="size-5" />
               </Button>
-              <span className="text-base font-bold">{title ?? "گله‌یار"}</span>
+              <span className="truncate text-base font-bold">{title ?? "گله‌یار"}</span>
             </span>
           )}
-          <span className="flex items-center gap-1">
+
+          <span className="flex items-center justify-end gap-1">
             <ThemeToggle />
             <Button variant="ghost" size="icon" asChild>
               <Link href="/settings">
@@ -285,6 +311,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="right" className="flex flex-col p-0">
+          <SheetHeader className="border-b border-border">
+            <SheetTitle className="flex items-center gap-2 text-lg">
+              <Logo size={24} />
+              گله‌یار
+            </SheetTitle>
+          </SheetHeader>
+          <ul className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+            {HAMBURGER_MENU.map((item) => {
+              const Icon = item.icon;
+              if (item.comingSoon) {
+                return (
+                  <li key={item.href}>
+                    <div className="flex cursor-not-allowed items-center gap-3 rounded-xl p-3.5 text-muted-foreground opacity-60">
+                      <Icon className="size-6 shrink-0" />
+                      <span className="flex-1 text-base font-medium">{item.label}</span>
+                      <Badge variant="secondary">به‌زودی</Badge>
+                    </div>
+                  </li>
+                );
+              }
+              const active = pathname.startsWith(item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl p-3.5 text-base font-medium transition-colors active:bg-muted",
+                      active ? "bg-primary/10 text-primary" : "text-foreground"
+                    )}
+                  >
+                    <Icon className="size-6 shrink-0" />
+                    <span className="flex-1">{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
