@@ -118,6 +118,12 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
         father_id: null,
         mother_id: null,
         status: "active",
+        // Only animals auto-created from a birth record get a generated_id.
+        generated_id: null,
+        species_code: null,
+        birth_year: null,
+        offspring_number: null,
+        gender_code: null,
       });
       toast.success("دام با موفقیت ثبت شد");
       router.push("/animals");

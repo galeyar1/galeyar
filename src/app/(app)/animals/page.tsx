@@ -74,6 +74,7 @@ export default function AnimalsPage() {
         const motherTag = a.mother_id ? earTagOf.get(a.mother_id) ?? "" : "";
         const haystack = [
           a.ear_tag,
+          a.generated_id ?? "",
           a.name ?? "",
           a.id,
           a.breed ?? "",

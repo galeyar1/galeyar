@@ -110,7 +110,10 @@ export default function HistoryPage() {
           icon: Baby,
           color: "text-success",
           title: `زایمان — ${earTagOf.get(r.mother_id) ?? "؟"}`,
-          detail: `${toPersianDigits(r.male_offspring_count)} نر، ${toPersianDigits(r.female_offspring_count)} ماده`,
+          detail: [
+            `${toPersianDigits(r.male_offspring_count)} نر، ${toPersianDigits(r.female_offspring_count)} ماده`,
+            ...(r.offspring_generated_ids?.length ? [r.offspring_generated_ids.join("، ")] : []),
+          ].join(" — "),
         })),
       ...treatments
         .filter((r) => !r.deleted_at)

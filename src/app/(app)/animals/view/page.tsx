@@ -149,7 +149,10 @@ function AnimalDetail({ animalId }: { animalId: string }) {
           icon: Baby,
           color: "text-success",
           title: "زایمان",
-          detail: `${toPersianDigits(r.male_offspring_count)} نر، ${toPersianDigits(r.female_offspring_count)} ماده`,
+          detail: [
+            `${toPersianDigits(r.male_offspring_count)} نر، ${toPersianDigits(r.female_offspring_count)} ماده`,
+            ...(r.offspring_generated_ids?.length ? [r.offspring_generated_ids.join("، ")] : []),
+          ].join(" — "),
         })),
       ...treatments
         .filter((r) => !r.deleted_at)
@@ -238,6 +241,7 @@ function AnimalDetail({ animalId }: { animalId: string }) {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <InfoRow label="پلاک گوش" value={animal.ear_tag} />
+          {animal.generated_id && <InfoRow label="شناسه خودکار (زایمان)" value={animal.generated_id} />}
           <InfoRow label="شناسه داخلی" value={animal.id.slice(0, 8)} />
           <InfoRow label="نام" value={animal.name ?? "—"} />
           <InfoRow label="گونه" value={SPECIES_LABELS[animal.species]} />

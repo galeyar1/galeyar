@@ -65,6 +65,12 @@ export interface Animal {
   mother_id: string | null;
   status: AnimalStatus;
   notes: string | null;
+  /** Set only for animals auto-created from a birth record, e.g. "SH-125-05-M1". */
+  generated_id: string | null;
+  species_code: string | null;
+  birth_year: string | null;
+  offspring_number: number | null;
+  gender_code: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -119,6 +125,8 @@ export interface BirthRecord {
   female_offspring_count: number;
   birth_date: string;
   notes: string | null;
+  /** The auto-generated IDs assigned to this birth event's offspring, e.g. ["SH-125-05-M1", "SH-125-05-F1"]. */
+  offspring_generated_ids: string[] | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
