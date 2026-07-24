@@ -4,7 +4,9 @@ import type {
   BirthRecord,
   Deworming,
   DiseaseRecord,
+  FinancialTransaction,
   MilkRecord,
+  SupportTicket,
   SyncableTable,
   Treatment,
   UserProfile,
@@ -50,6 +52,8 @@ class GaleyarDatabase extends Dexie {
   treatments!: Table<Local<Treatment>, string>;
   vaccinations!: Table<Local<Vaccination>, string>;
   deworming_records!: Table<Local<Deworming>, string>;
+  financial_transactions!: Table<Local<FinancialTransaction>, string>;
+  support_tickets!: Table<Local<SupportTicket>, string>;
   sync_queue!: Table<SyncQueueItem, number>;
   sync_meta!: Table<SyncMeta, string>;
   profile!: Table<CachedProfile, string>;
@@ -83,6 +87,11 @@ class GaleyarDatabase extends Dexie {
 
     this.version(3).stores({
       deworming_records: "id, farm_id, animal_id, next_due_date, sync_status, deleted_at",
+    });
+
+    this.version(4).stores({
+      financial_transactions: "id, farm_id, type, transaction_date, animal_id, sync_status, deleted_at",
+      support_tickets: "id, farm_id, status, sync_status, deleted_at",
     });
   }
 }

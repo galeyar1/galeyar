@@ -23,6 +23,20 @@ export type FeedType =
 export type FeedUnit = "kg" | "ton" | "bag";
 export type NotificationType = "feed_low" | "disease_alert" | "ai_suggestion" | "system";
 export type DewormingType = "internal" | "external";
+export type FinancialTransactionType = "income" | "expense";
+export type IncomeCategory = "animal_sale" | "milk_sale" | "wool_sale" | "breeding_service" | "other";
+export type ExpenseCategory =
+  | "feed"
+  | "veterinary"
+  | "vaccines"
+  | "transportation"
+  | "salaries"
+  | "utilities"
+  | "equipment"
+  | "other";
+export type SupportTicketCategory = "chat" | "technical" | "veterinary" | "nutrition" | "callback";
+export type SupportTicketPriority = "low" | "normal" | "high" | "urgent";
+export type SupportTicketStatus = "open" | "in_progress" | "resolved" | "closed";
 export type ExitReason =
   | "sale"
   | "slaughterhouse"
@@ -259,6 +273,49 @@ export interface Deworming {
   deleted_at: string | null;
 }
 
+export interface FinancialTransaction {
+  id: string;
+  farm_id: string;
+  type: FinancialTransactionType;
+  category: string;
+  amount: number;
+  transaction_date: string;
+  description: string | null;
+  /** Counterparty name — who owes the farm (unsettled income) or is owed by it (unsettled expense). */
+  party_name: string | null;
+  due_date: string | null;
+  is_settled: boolean;
+  animal_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface SupportTicket {
+  id: string;
+  farm_id: string;
+  title: string;
+  description: string;
+  category: SupportTicketCategory;
+  priority: SupportTicketPriority;
+  status: SupportTicketStatus;
+  attachment_url: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface SupportTicketMessage {
+  id: string;
+  ticket_id: string;
+  farm_id: string;
+  sender_id: string | null;
+  message: string;
+  created_at: string;
+}
+
 export type PedigreeRelationType = "father" | "mother";
 
 export interface PedigreeRelation {
@@ -281,4 +338,6 @@ export type SyncableTable =
   | "birth_records"
   | "treatments"
   | "vaccinations"
-  | "deworming_records";
+  | "deworming_records"
+  | "financial_transactions"
+  | "support_tickets";

@@ -14,6 +14,7 @@ import {
   Wheat,
   ArrowRight,
   GitBranch,
+  Briefcase,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -38,6 +39,7 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
     { href: "/feed", label: "خوراک", icon: Wheat },
     { href: "/reports", label: "گزارش", icon: BarChart3 },
     { href: "/ai", label: "دستیار", icon: Sparkles },
+    { href: "/business", label: "کسب‌وکار", icon: Briefcase },
   ],
   operator: [
     { href: "/home", label: "خانه", icon: HomeIcon },
@@ -56,6 +58,7 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
     { href: "/pedigree", label: "شجره‌نامه", icon: GitBranch },
     { href: "/reports", label: "گزارش", icon: BarChart3 },
     { href: "/ai", label: "دستیار", icon: Sparkles },
+    { href: "/business", label: "کسب‌وکار", icon: Briefcase },
   ],
 };
 
@@ -83,6 +86,16 @@ const PAGE_TITLES: Record<string, string> = {
   "/ai/deworming": "دستیار ضد انگل",
   "/ai/herd-growth": "دستیار رشد گله",
   "/ai/genetics": "دستیار ژنتیک",
+  "/register/finance": "ثبت تراکنش مالی",
+  "/business/finance": "هوش مالی",
+  "/business/global-dashboard": "داشبورد کل دامداری‌ها",
+  "/business/analytics": "تحلیل کسب‌وکار",
+  "/business/performance": "عملکرد دامداری",
+  "/business/genetics": "ژنتیک پیشرفته",
+  "/business/reports": "گزارشات پیشرفته",
+  "/business/notifications": "مرکز اعلان‌ها",
+  "/business/support": "مرکز پشتیبانی",
+  "/business/education": "مرکز آموزش",
 };
 
 /** Breadcrumb trail for nested pages — the back button covers "go one step back", this covers "where am I". */
@@ -105,10 +118,20 @@ const BREADCRUMBS: Record<string, { label: string; href: string }[]> = {
   "/ai/deworming": [{ label: "دستیار هوشمند", href: "/ai" }],
   "/ai/herd-growth": [{ label: "دستیار هوشمند", href: "/ai" }],
   "/ai/genetics": [{ label: "دستیار هوشمند", href: "/ai" }],
+  "/register/finance": [{ label: "ثبت", href: "/register" }],
+  "/business/finance": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/global-dashboard": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/analytics": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/performance": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/genetics": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/reports": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/notifications": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/support": [{ label: "کسب‌وکار", href: "/business" }],
+  "/business/education": [{ label: "کسب‌وکار", href: "/business" }],
 };
 
 /** Routes that show the brand mark + settings gear instead of a back button — the roots of each bottom-nav tab. */
-const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/pedigree", "/register", "/history", "/home", "/ai"]);
+const TOP_LEVEL_PATHS = new Set(["/dashboard", "/animals", "/pedigree", "/register", "/history", "/home", "/ai", "/business"]);
 
 /**
  * Fallback destination when there's no browser history to go back to — e.g.
@@ -139,6 +162,16 @@ const BACK_FALLBACK: Record<string, string> = {
   "/ai/deworming": "/ai",
   "/ai/herd-growth": "/ai",
   "/ai/genetics": "/ai",
+  "/register/finance": "/register",
+  "/business/finance": "/business",
+  "/business/global-dashboard": "/business",
+  "/business/analytics": "/business",
+  "/business/performance": "/business",
+  "/business/genetics": "/business",
+  "/business/reports": "/business",
+  "/business/notifications": "/business",
+  "/business/support": "/business",
+  "/business/education": "/business",
 };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
