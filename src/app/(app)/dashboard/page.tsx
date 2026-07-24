@@ -293,7 +293,7 @@ export default function DashboardPage() {
     const speciesAnimals = (animals ?? []).filter((a) => a.species === species);
     if (speciesAnimals.length === 0) return null;
 
-    const buckets = new Map<string, { label: string; count: number; color: string }>();
+    const buckets = new Map<string, { value: string; label: string; count: number; color: string }>();
     for (const a of speciesAnimals) {
       const type = effectiveAnimalType(species, a.gender as "male" | "female" | null, a.birth_date);
       if (!type) continue;
@@ -302,7 +302,12 @@ export default function DashboardPage() {
       if (existing) {
         existing.count += 1;
       } else {
-        buckets.set(key, { label: type.label, count: 1, color: portfolioColor(species, type.gender, type.isJuvenile) });
+        buckets.set(key, {
+          value: type.value,
+          label: type.label,
+          count: 1,
+          color: portfolioColor(species, type.gender, type.isJuvenile),
+        });
       }
     }
 
@@ -312,6 +317,16 @@ export default function DashboardPage() {
       entries: [...buckets.values()],
     };
   }).filter((p): p is NonNullable<typeof p> => p !== null);
+
+  // Flat list across every species/type, for the percentage breakdown under
+  // the herd composition chart — same underlying category data as the
+  // "پرتفوی دام‌ها" card below, just combined into one row instead of one
+  // donut per species.
+  const totalActiveAnimals = animals?.length ?? 0;
+  const herdCategoryPercentages = portfolioBySpecies
+    .flatMap((p) => p.entries)
+    .map((e) => ({ ...e, percent: totalActiveAnimals > 0 ? Math.round((e.count / totalActiveAnimals) * 100) : 0 }))
+    .sort((a, b) => b.count - a.count);
 
   const feedConsumptionChartData = feedInventory.map((item) => ({
     name: feedLabel(item),
@@ -370,16 +385,31 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={chartData} dataKey="value" nameKey="name" outerRadius={80} label>
-                  {chartData.map((_, index) => (
-                    <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={chartData} dataKey="value" nameKey="name" outerRadius={80} label>
+                    {chartData.map((_, index) => (
+                      <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 pt-2 text-sm">
+                {herdCategoryPercentages.map((e) => (
+                  <Link
+                    key={e.value}
+                    href={`/animals?type=${e.value}`}
+                    className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                    style={{ backgroundColor: `${e.color}1a`, color: e.color }}
+                  >
+                    <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
+                    {e.label}: {toPersianDigits(e.percent)}٪
+                  </Link>
+                ))}
+              </div>
+            </>
           ) : (
             <p className="text-center text-muted-foreground">هنوز دامی ثبت نشده است.</p>
           )}

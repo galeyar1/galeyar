@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Plus, Clock, Search, SlidersHorizontal, Pencil, Trash2, GitBranch } from "lucide-react";
+import { Plus, Clock, Search, SlidersHorizontal, Pencil, Trash2, GitBranch, X } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -27,7 +28,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { updateRecord } from "@/lib/sync/repository";
-import { SPECIES_LABELS, ANIMAL_STATUS_LABELS, effectiveAnimalTypeLabel, ageInYears } from "@/lib/animal-labels";
+import {
+  SPECIES_LABELS,
+  ANIMAL_STATUS_LABELS,
+  effectiveAnimalType,
+  effectiveAnimalTypeLabel,
+  animalTypeLabel,
+  ageInYears,
+} from "@/lib/animal-labels";
 import { EXIT_REASON_LABELS, statusForExitReason } from "@/lib/exit-reasons";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
 import type { Local } from "@/lib/db/schema";
@@ -45,11 +53,17 @@ function matchesAge(bucket: AgeBucket, years: number | null): boolean {
   return years > 3;
 }
 
-export default function AnimalsPage() {
+function AnimalsPageContent() {
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
   const canDelete = profile?.role === "owner";
   const canEdit = profile?.role === "owner" || profile?.role === "operator";
+  const searchParams = useSearchParams();
+  // Deep link from the dashboard's herd-composition percentages (e.g.
+  // /animals?type=ewe_lamb) — an exact effectiveAnimalType value, distinct
+  // from the manual species/gender filters below since it also captures the
+  // juvenile/adult split those don't.
+  const typeFilter = searchParams.get("type");
 
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -97,9 +111,14 @@ export default function AnimalsPage() {
       if (breedFilter !== "all" && a.breed !== breedFilter) return false;
       if (statusFilter !== "all" && a.status !== statusFilter) return false;
       if (!matchesAge(ageFilter, ageInYears(a.birth_date))) return false;
+      if (typeFilter) {
+        const gender = a.gender === "male" || a.gender === "female" ? a.gender : null;
+        const effective = effectiveAnimalType(a.species, gender, a.birth_date);
+        if (effective?.value !== typeFilter) return false;
+      }
       return true;
     });
-  }, [animals, query, earTagOf, speciesFilter, genderFilter, breedFilter, statusFilter, ageFilter]);
+  }, [animals, query, earTagOf, speciesFilter, genderFilter, breedFilter, statusFilter, ageFilter, typeFilter]);
 
   const summary = useMemo(() => {
     const counts: Record<string, number> = { total: (animals ?? []).length };
@@ -149,6 +168,17 @@ export default function AnimalsPage() {
           مشاهده شجره‌نامه
         </Link>
       </Button>
+
+      {typeFilter && (
+        <div className="flex items-center justify-between rounded-xl bg-primary/10 p-3 text-sm text-primary">
+          <span>فیلتر فعال: {animalTypeLabel(typeFilter)}</span>
+          <Button asChild variant="ghost" size="icon-sm" aria-label="حذف فیلتر">
+            <Link href="/animals">
+              <X className="size-4" />
+            </Link>
+          </Button>
+        </div>
+      )}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         <Card className="min-w-[100px]">
@@ -338,5 +368,13 @@ export default function AnimalsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function AnimalsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AnimalsPageContent />
+    </Suspense>
   );
 }
