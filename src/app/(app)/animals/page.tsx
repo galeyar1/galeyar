@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Plus, Clock, Search, SlidersHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, Clock, Search, SlidersHorizontal, Pencil, Trash2, GitBranch } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -143,6 +143,13 @@ export default function AnimalsPage() {
         </Button>
       </div>
 
+      <Button asChild variant="outline" size="lg" className="h-12">
+        <Link href="/pedigree">
+          <GitBranch className="size-5" />
+          مشاهده شجره‌نامه
+        </Link>
+      </Button>
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         <Card className="min-w-[100px]">
           <CardContent className="flex flex-col gap-0.5 p-3">
@@ -269,6 +276,11 @@ export default function AnimalsPage() {
                       <Badge variant={animal.status === "active" ? "default" : "secondary"}>
                         {ANIMAL_STATUS_LABELS[animal.status]}
                       </Badge>
+                      <Button variant="ghost" size="icon-sm" asChild aria-label="مشاهده شجره‌نامه">
+                        <Link href={`/pedigree/view?id=${animal.id}`}>
+                          <GitBranch className="size-4" />
+                        </Link>
+                      </Button>
                       {canEdit && (
                         <Button variant="ghost" size="icon-sm" asChild aria-label="ویرایش">
                           <Link href={`/animals/new?id=${animal.id}`}>

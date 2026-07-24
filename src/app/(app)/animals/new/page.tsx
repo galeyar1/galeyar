@@ -27,11 +27,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS, breedOptionsFor, DEFAULT_BREED } from "@/lib/animal-labels";
-import { todayIso } from "@/lib/jalali";
+import { todayIso, toPersianDigits } from "@/lib/jalali";
+import { canBePregnant, computeExpectedBirthDate, MAX_PREGNANCY_MONTH } from "@/lib/pregnancy";
 import type { Species } from "@/lib/supabase/types";
 
 const SPECIES_OPTIONS = Object.keys(SPECIES_LABELS) as Species[];
@@ -46,6 +48,8 @@ const schema = z.object({
     .string()
     .optional()
     .refine((v) => !v || v <= todayIso(), { message: "تاریخ تولد نمی‌تواند در آینده باشد" }),
+  is_pregnant: z.boolean().optional(),
+  pregnancy_month: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -58,6 +62,8 @@ const EMPTY_VALUES: FormValues = {
   animal_type: "",
   breed: DEFAULT_BREED,
   birth_date: "",
+  is_pregnant: false,
+  pregnancy_month: "",
   notes: "",
 };
 
@@ -85,6 +91,8 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
         animal_type: existing.animal_type ?? "",
         breed: existing.breed ?? "",
         birth_date: existing.birth_date ?? "",
+        is_pregnant: existing.is_pregnant ?? false,
+        pregnancy_month: existing.pregnancy_month ? String(existing.pregnancy_month) : "",
         notes: existing.notes ?? "",
       });
     }
@@ -92,8 +100,22 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
   }, [existing?.id]);
 
   const species = form.watch("species");
+  const animalType = form.watch("animal_type");
+  const isPregnant = form.watch("is_pregnant");
   const typeOptions = ANIMAL_TYPES_BY_SPECIES[species];
   const breedOptions = breedOptionsFor(species);
+  const pregnancyEligible = canBePregnant(species, animalType);
+  const maxPregnancyMonth = MAX_PREGNANCY_MONTH[species];
+
+  // If the species/type changes away from a pregnancy-eligible one, clear
+  // any pregnancy state instead of silently keeping stale hidden data.
+  useEffect(() => {
+    if (!pregnancyEligible && (form.getValues("is_pregnant") || form.getValues("pregnancy_month"))) {
+      form.setValue("is_pregnant", false);
+      form.setValue("pregnancy_month", "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pregnancyEligible]);
 
   async function onSubmit(values: FormValues) {
     if (!profile?.farm_id || !session) {
@@ -104,6 +126,9 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     console.log("[animals/new] submitting", { animalId, values });
 
     const selectedType = typeOptions.find((t) => t.value === values.animal_type);
+    const eligible = canBePregnant(values.species, values.animal_type);
+    const pregnant = eligible && !!values.is_pregnant && !!values.pregnancy_month;
+    const pregnancyMonthNum = pregnant ? Number(values.pregnancy_month) : null;
 
     const payload = {
       ear_tag: values.ear_tag,
@@ -113,6 +138,11 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
       breed: values.breed || null,
       gender: selectedType?.gender ?? null,
       birth_date: values.birth_date || null,
+      is_pregnant: pregnant,
+      pregnancy_month: pregnancyMonthNum,
+      expected_birth_date: pregnant
+        ? computeExpectedBirthDate(values.species, pregnancyMonthNum!, todayIso())
+        : null,
       notes: values.notes || null,
     };
 
@@ -282,6 +312,49 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
               </FormItem>
             )}
           />
+
+          {pregnancyEligible && (
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted p-3">
+              <FormField
+                control={form.control}
+                name="is_pregnant"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between gap-2">
+                    <FormLabel className="text-base">آبستن</FormLabel>
+                    <FormControl>
+                      <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {isPregnant && (
+                <FormField
+                  control={form.control}
+                  name="pregnancy_month"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base">ماه آبستنی</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-12 w-full text-lg">
+                            <SelectValue placeholder="انتخاب کنید" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Array.from({ length: maxPregnancyMonth }, (_, i) => i + 1).map((m) => (
+                            <SelectItem key={m} value={String(m)}>
+                              ماه {toPersianDigits(m)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+          )}
 
           <FormField
             control={form.control}

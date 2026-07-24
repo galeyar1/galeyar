@@ -29,7 +29,8 @@ import {
   effectiveAnimalTypeLabel,
   ageLabel,
 } from "@/lib/animal-labels";
-import { formatJalali, toPersianDigits } from "@/lib/jalali";
+import { formatJalali, toPersianDigits, todayIso } from "@/lib/jalali";
+import { daysUntilBirth, pregnancyStage } from "@/lib/pregnancy";
 import type { SyncableTable } from "@/lib/supabase/types";
 
 interface TimelineEntry {
@@ -200,6 +201,19 @@ function AnimalDetail({ animalId }: { animalId: string }) {
     return <p className="p-4 text-center text-muted-foreground">دام یافت نشد</p>;
   }
 
+  const pregnancyBadge = (() => {
+    if (!animal.is_pregnant) return null;
+    const days = animal.expected_birth_date ? daysUntilBirth(animal.expected_birth_date, todayIso()) : null;
+    const stage = days !== null ? pregnancyStage(days) : "in_progress";
+    if (stage === "near_birth" || stage === "overdue") {
+      return { label: "نزدیک زایش", className: "bg-destructive/10 text-destructive" };
+    }
+    return {
+      label: `آبستن${animal.pregnancy_month ? ` (ماه ${toPersianDigits(animal.pregnancy_month)})` : ""}`,
+      className: "bg-warning/10 text-warning",
+    };
+  })();
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4">
@@ -231,6 +245,9 @@ function AnimalDetail({ animalId }: { animalId: string }) {
             )}
           </div>
         </div>
+        {pregnancyBadge && (
+          <Badge className={pregnancyBadge.className}>{pregnancyBadge.label}</Badge>
+        )}
         {animal.notes && <p className="text-sm">{animal.notes}</p>}
       </div>
 

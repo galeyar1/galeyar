@@ -6,6 +6,7 @@ import {
   daysUntilBirth,
   pregnancyStage,
   pregnancyStatusLabel,
+  canBePregnant,
 } from "@/lib/pregnancy";
 
 describe("gestation constants", () => {
@@ -46,5 +47,25 @@ describe("pregnancyStatusLabel", () => {
     expect(pregnancyStatusLabel(10)).toBe("تا ۱۰ روز دیگر زایش خواهد کرد");
     expect(pregnancyStatusLabel(0)).toBe("زایش امروز");
     expect(pregnancyStatusLabel(-3)).toBe("۳ روز از سررسید زایش گذشته است");
+  });
+});
+
+describe("canBePregnant", () => {
+  it("matches the spec's trigger conditions per species (adult female, except cattle also includes the female calf)", () => {
+    expect(canBePregnant("sheep", "ewe")).toBe(true);
+    expect(canBePregnant("sheep", "ram")).toBe(false);
+    expect(canBePregnant("sheep", "ewe_lamb")).toBe(false);
+    expect(canBePregnant("goat", "doe")).toBe(true);
+    expect(canBePregnant("goat", "female_kid")).toBe(false);
+    expect(canBePregnant("cattle", "cow")).toBe(true);
+    expect(canBePregnant("cattle", "female_calf")).toBe(true);
+    expect(canBePregnant("horse", "mare")).toBe(true);
+    expect(canBePregnant("camel", "female_camel")).toBe(true);
+    expect(canBePregnant("camel", "female_camel_calf")).toBe(false);
+  });
+
+  it("is false for null/undefined animal_type", () => {
+    expect(canBePregnant("sheep", null)).toBe(false);
+    expect(canBePregnant("sheep", undefined)).toBe(false);
   });
 });

@@ -55,3 +55,22 @@ export function pregnancyStatusLabel(daysUntil: number): string {
   if (daysUntil > 0) return `تا ${toPersianDigits(daysUntil)} روز دیگر زایش خواهد کرد`;
   return `${toPersianDigits(Math.abs(daysUntil))} روز از سررسید زایش گذشته است`;
 }
+
+/**
+ * Which animal_type values the registration form's pregnancy option applies
+ * to — matches src/lib/animal-labels.ts's ANIMAL_TYPES_BY_SPECIES values,
+ * not just "any female": e.g. a ewe lamb or doe kid is excluded, but per the
+ * spec a female calf is explicitly included alongside an adult cow.
+ */
+export const PREGNANCY_ELIGIBLE_TYPES: Record<Species, string[]> = {
+  sheep: ["ewe"],
+  goat: ["doe"],
+  cattle: ["cow", "female_calf"],
+  horse: ["mare"],
+  camel: ["female_camel"],
+};
+
+export function canBePregnant(species: Species, animalType: string | null | undefined): boolean {
+  if (!animalType) return false;
+  return PREGNANCY_ELIGIBLE_TYPES[species].includes(animalType);
+}
