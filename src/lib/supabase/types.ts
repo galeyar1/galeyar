@@ -73,6 +73,8 @@ export interface Farm {
   subscription_expires_at: string | null;
 }
 
+export type UserAccountStatus = "active" | "suspended";
+
 export interface UserProfile {
   id: string;
   full_name: string | null;
@@ -82,6 +84,9 @@ export interface UserProfile {
   farm_id: string | null;
   created_at: string;
   is_platform_admin: boolean;
+  /** Control Center (admin.galeyar.ir) user management. */
+  status: UserAccountStatus;
+  last_login_at: string | null;
 }
 
 export type SubscriptionPlan = "free" | "silver" | "gold" | "professional";
@@ -103,7 +108,7 @@ export interface PaymentTransaction {
 }
 
 export type MarketplaceCategory = "animal" | "feed" | "equipment" | "service" | "medicine";
-export type MarketplaceListingStatus = "active" | "sold" | "expired" | "removed";
+export type MarketplaceListingStatus = "pending" | "active" | "rejected" | "sold" | "expired" | "removed";
 
 export interface MarketplaceListing {
   id: string;
@@ -119,6 +124,8 @@ export interface MarketplaceListing {
   images: string[];
   attributes: Record<string, string | number>;
   status: MarketplaceListingStatus;
+  /** Set by an admin in the Control Center's Marketplace Management module. */
+  featured: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -390,6 +397,8 @@ export interface SupportTicket {
   priority: SupportTicketPriority;
   status: SupportTicketStatus;
   attachment_url: string | null;
+  /** Set by an admin in the Control Center's Support module. */
+  assigned_to: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

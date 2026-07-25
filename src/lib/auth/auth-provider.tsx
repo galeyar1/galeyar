@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
 import { db } from "@/lib/db/schema";
 import type { UserProfile } from "@/lib/supabase/types";
@@ -39,8 +40,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      setProfile(data as UserProfile);
-      await db.profile.put({ ...(data as UserProfile), cacheKey: "current" });
+      const loaded = data as UserProfile;
+      if (loaded.status === "suspended") {
+        // Control Center (admin.galeyar.ir) suspension — sign out immediately
+        // rather than leaving a suspended account signed in with stale data.
+        await supabase.auth.signOut();
+        await db.profile.delete("current");
+        setProfile(null);
+        toast.error("حساب کاربری شما مسدود شده است. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.");
+        return;
+      }
+
+      setProfile(loaded);
+      await db.profile.put({ ...loaded, cacheKey: "current" });
     } catch {
       // Offline (or first paint before the network settles): fall back to
       // whatever profile we last saw for this device.
@@ -64,10 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       if (newSession) {
         void loadProfile(newSession.user.id);
+        if (event === "SIGNED_IN") {
+          void supabase.from("users").update({ last_login_at: new Date().toISOString() }).eq("id", newSession.user.id);
+        }
       } else {
         setProfile(null);
         void db.profile.delete("current");

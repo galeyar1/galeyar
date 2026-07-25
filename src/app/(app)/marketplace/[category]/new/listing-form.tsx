@@ -226,7 +226,7 @@ function ListingFormInner({ category }: { category: MarketplaceCategory }) {
           created_by: session.user.id,
         });
         if (error) throw error;
-        toast.success("آگهی با موفقیت ثبت شد");
+        toast.success("آگهی ثبت شد و پس از تأیید مدیر گله‌یار نمایش داده می‌شود");
       }
 
       router.push(`/marketplace/${category}`);
