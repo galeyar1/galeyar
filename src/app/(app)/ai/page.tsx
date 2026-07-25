@@ -18,6 +18,7 @@ import {
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
+import { FeatureGate } from "@/components/feature-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toPersianDigits, todayIso } from "@/lib/jalali";
 import { daysUntilBirth, pregnancyStage } from "@/lib/pregnancy";
@@ -51,7 +52,7 @@ interface MenuItem {
   tone: "default" | "alert";
 }
 
-export default function AiCenterPage() {
+function AiCenterPageContent() {
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
   const today = todayIso();
@@ -301,5 +302,13 @@ export default function AiCenterPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AiCenterPage() {
+  return (
+    <FeatureGate feature="ai_assistant">
+      <AiCenterPageContent />
+    </FeatureGate>
   );
 }

@@ -96,6 +96,19 @@ const PAGE_TITLES: Record<string, string> = {
   "/business/notifications": "مرکز اعلان‌ها",
   "/business/support": "مرکز پشتیبانی",
   "/business/education": "مرکز آموزش",
+  "/subscriptions": "اشتراک‌ها",
+  "/marketplace": "بازار گله‌یار",
+  "/marketplace/animal": "دام",
+  "/marketplace/feed": "خوراک",
+  "/marketplace/equipment": "تجهیزات",
+  "/marketplace/service": "خدمات",
+  "/marketplace/medicine": "دارو",
+  "/marketplace/animal/new": "ثبت آگهی دام",
+  "/marketplace/feed/new": "ثبت آگهی خوراک",
+  "/marketplace/equipment/new": "ثبت آگهی تجهیزات",
+  "/marketplace/service/new": "ثبت آگهی خدمات",
+  "/marketplace/medicine/new": "ثبت آگهی دارو",
+  "/admin": "پنل مدیریت",
 };
 
 /** Breadcrumb trail for nested pages — the back button covers "go one step back", this covers "where am I". */
@@ -130,6 +143,16 @@ const BREADCRUMBS: Record<string, { label: string; href: string }[]> = {
   "/business/notifications": [{ label: "کسب‌وکار", href: "/business" }],
   "/business/support": [{ label: "کسب‌وکار", href: "/business" }],
   "/business/education": [{ label: "کسب‌وکار", href: "/business" }],
+  "/marketplace/animal": [{ label: "بازار گله‌یار", href: "/marketplace" }],
+  "/marketplace/feed": [{ label: "بازار گله‌یار", href: "/marketplace" }],
+  "/marketplace/equipment": [{ label: "بازار گله‌یار", href: "/marketplace" }],
+  "/marketplace/service": [{ label: "بازار گله‌یار", href: "/marketplace" }],
+  "/marketplace/medicine": [{ label: "بازار گله‌یار", href: "/marketplace" }],
+  "/marketplace/animal/new": [{ label: "دام", href: "/marketplace/animal" }],
+  "/marketplace/feed/new": [{ label: "خوراک", href: "/marketplace/feed" }],
+  "/marketplace/equipment/new": [{ label: "تجهیزات", href: "/marketplace/equipment" }],
+  "/marketplace/service/new": [{ label: "خدمات", href: "/marketplace/service" }],
+  "/marketplace/medicine/new": [{ label: "دارو", href: "/marketplace/medicine" }],
 };
 
 /** Routes that show the brand mark + settings gear instead of a back button — the roots of each bottom-nav tab. */
@@ -185,6 +208,19 @@ const BACK_FALLBACK: Record<string, string> = {
   "/business/notifications": "/business",
   "/business/support": "/business",
   "/business/education": "/business",
+  "/subscriptions": "/dashboard",
+  "/marketplace": "/dashboard",
+  "/marketplace/animal": "/marketplace",
+  "/marketplace/feed": "/marketplace",
+  "/marketplace/equipment": "/marketplace",
+  "/marketplace/service": "/marketplace",
+  "/marketplace/medicine": "/marketplace",
+  "/marketplace/animal/new": "/marketplace/animal",
+  "/marketplace/feed/new": "/marketplace/feed",
+  "/marketplace/equipment/new": "/marketplace/equipment",
+  "/marketplace/service/new": "/marketplace/service",
+  "/marketplace/medicine/new": "/marketplace/medicine",
+  "/admin": "/dashboard",
 };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

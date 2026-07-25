@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { updateRecord } from "@/lib/sync/repository";
 import { AnimalPicker } from "@/components/animal-picker";
+import { FeatureGate } from "@/components/feature-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -127,7 +128,7 @@ function GeneticsOverrideEditor({ farmId }: { farmId: string }) {
   );
 }
 
-export default function GeneticIntelligencePage() {
+function GeneticIntelligencePageContent() {
   const { profile } = useAuth();
   const farmId = profile?.farm_id;
 
@@ -366,5 +367,13 @@ export default function GeneticIntelligencePage() {
 
       {farmId && <GeneticsOverrideEditor farmId={farmId} />}
     </div>
+  );
+}
+
+export default function GeneticIntelligencePage() {
+  return (
+    <FeatureGate feature="genetic_intelligence">
+      <GeneticIntelligencePageContent />
+    </FeatureGate>
   );
 }

@@ -28,12 +28,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
+import Link from "next/link";
+import { Lock } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS, breedOptionsFor, DEFAULT_BREED } from "@/lib/animal-labels";
 import { todayIso, toPersianDigits } from "@/lib/jalali";
 import { canBePregnant, computeExpectedBirthDate, MAX_PREGNANCY_MONTH } from "@/lib/pregnancy";
+import { useFarmPlan } from "@/lib/hooks/use-farm-plan";
+import { isAtAnimalLimit, PLAN_LIMITS, PLAN_LABELS } from "@/lib/subscription-plans";
 import type { Species } from "@/lib/supabase/types";
 
 const SPECIES_OPTIONS = Object.keys(SPECIES_LABELS) as Species[];
@@ -76,6 +81,13 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     () => (animalId ? db.animals.get(animalId) : undefined),
     [animalId]
   );
+
+  const { plan, loading: planLoading } = useFarmPlan();
+  const activeAnimalCount = useLiveQuery(async () => {
+    if (!profile?.farm_id) return null;
+    const rows = await db.animals.where("farm_id").equals(profile.farm_id).toArray();
+    return rows.filter((a) => !a.deleted_at && a.status === "active").length;
+  }, [profile?.farm_id]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -182,6 +194,25 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (!animalId && !planLoading && typeof activeAnimalCount === "number" && isAtAnimalLimit(plan, activeAnimalCount)) {
+    return (
+      <div className="flex flex-col gap-4 p-4">
+        <h1 className="text-xl font-bold">ثبت دام جدید</h1>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+            <Lock className="size-8 text-muted-foreground" />
+            <p className="text-base font-semibold">
+              پلن {PLAN_LABELS[plan]} شما اجازه ثبت حداکثر {toPersianDigits(PLAN_LIMITS[plan].maxAnimals ?? 0)} دام فعال را می‌دهد.
+            </p>
+            <Button asChild>
+              <Link href="/subscriptions">ارتقا پلن</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

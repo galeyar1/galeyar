@@ -21,7 +21,15 @@ export type FeedType =
   | "mineral_supplements"
   | "custom";
 export type FeedUnit = "kg" | "ton" | "bag";
-export type NotificationType = "feed_low" | "disease_alert" | "ai_suggestion" | "system";
+export type NotificationType =
+  | "feed_low"
+  | "disease_alert"
+  | "ai_suggestion"
+  | "system"
+  | "subscription_expiring"
+  | "marketplace_listing"
+  | "premium_feature"
+  | "payment_success";
 export type DewormingType = "internal" | "external";
 export type FinancialTransactionType = "income" | "expense";
 export type IncomeCategory = "animal_sale" | "milk_sale" | "wool_sale" | "breeding_service" | "other";
@@ -59,6 +67,10 @@ export interface Farm {
   twin_rate: number | null;
   mortality_rate: number | null;
   created_at: string;
+  /** Subscription Platform (src/lib/subscription-plans.ts). */
+  plan: SubscriptionPlan;
+  subscription_started_at: string | null;
+  subscription_expires_at: string | null;
 }
 
 export interface UserProfile {
@@ -69,6 +81,78 @@ export interface UserProfile {
   role: UserRole;
   farm_id: string | null;
   created_at: string;
+  is_platform_admin: boolean;
+}
+
+export type SubscriptionPlan = "free" | "silver" | "gold" | "professional";
+export type PaymentProviderId = "zarinpal" | "idpay" | "nextpay";
+export type PaymentStatus = "pending" | "success" | "failed";
+
+export interface PaymentTransaction {
+  id: string;
+  farm_id: string;
+  plan: SubscriptionPlan;
+  amount: number;
+  currency: string;
+  provider: PaymentProviderId;
+  status: PaymentStatus;
+  transaction_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MarketplaceCategory = "animal" | "feed" | "equipment" | "service" | "medicine";
+export type MarketplaceListingStatus = "active" | "sold" | "expired" | "removed";
+
+export interface MarketplaceListing {
+  id: string;
+  farm_id: string;
+  category: MarketplaceCategory;
+  title: string;
+  description: string | null;
+  price: number | null;
+  currency: string;
+  province: string | null;
+  city: string | null;
+  contact_phone: string | null;
+  images: string[];
+  attributes: Record<string, string | number>;
+  status: MarketplaceListingStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface ReferralCode {
+  user_id: string;
+  code: string;
+  created_at: string;
+}
+
+export interface ReferralRedemption {
+  id: string;
+  code: string;
+  referrer_user_id: string;
+  referred_user_id: string;
+  reward_days: number;
+  redeemed_at: string;
+}
+
+export type AdvertisementStatus = "draft" | "active" | "archived";
+
+export interface Advertisement {
+  id: string;
+  title: string;
+  body: string | null;
+  image_url: string | null;
+  link_url: string | null;
+  sponsor_name: string | null;
+  status: AdvertisementStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FarmInvite {

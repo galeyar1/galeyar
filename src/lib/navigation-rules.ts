@@ -60,6 +60,6 @@ export const HAMBURGER_MENU: NavRuleItem[] = [
   { href: "/farms", label: "چند دامداری", icon: Building2 },
   { href: "/register/vaccination", label: "واکسیناسیون", icon: Syringe },
   { href: "/register/deworming", label: "ضد انگل", icon: Bug },
-  { href: "/marketplace", label: "بازار گله‌یار", icon: Store, comingSoon: true },
-  { href: "/subscriptions", label: "اشتراک‌ها", icon: CreditCard, comingSoon: true },
+  { href: "/marketplace", label: "بازار گله‌یار", icon: Store },
+  { href: "/subscriptions", label: "اشتراک‌ها", icon: CreditCard },
 ];
