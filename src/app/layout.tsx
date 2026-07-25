@@ -22,10 +22,22 @@ const ICON_VERSION = "2";
 const iconUrl = (path: string) => `${path}?v=${ICON_VERSION}`;
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://galeyar.ir"),
   title: "گله‌یار | دستیار هوشمند مدیریت دامداری",
   description: "دستیار هوشمند مدیریت دامداری",
   applicationName: "گله‌یار",
   manifest: iconUrl("/manifest.webmanifest"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "گله‌یار | دستیار هوشمند مدیریت دامداری",
+    description: "دستیار هوشمند مدیریت دامداری",
+    url: "https://galeyar.ir",
+    siteName: "گله‌یار",
+    locale: "fa_IR",
+    type: "website",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
