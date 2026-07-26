@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const loaded = data as UserProfile;
       if (loaded.status === "suspended") {
-        // Control Center (admingaleyar.ir) suspension — sign out immediately
+        // Control Center (admin.galeyar.ir) suspension — sign out immediately
         // rather than leaving a suspended account signed in with stale data.
         await supabase.auth.signOut();
         await db.profile.delete("current");
