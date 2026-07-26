@@ -84,7 +84,7 @@ export interface UserProfile {
   farm_id: string | null;
   created_at: string;
   is_platform_admin: boolean;
-  /** Control Center (admin.galeyar.ir) user management. */
+  /** Control Center (admingaleyar.ir) user management. */
   status: UserAccountStatus;
   last_login_at: string | null;
 }

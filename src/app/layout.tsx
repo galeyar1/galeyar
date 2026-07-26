@@ -22,7 +22,12 @@ const ICON_VERSION = "2";
 const iconUrl = (path: string) => `${path}?v=${ICON_VERSION}`;
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://galeyar.ir"),
+  // app.galeyar.ir is the livestock-management application itself (private,
+  // authenticated content) — galeyar.ir is reserved for a future separate
+  // public marketing site. robots below keeps this domain out of search
+  // results; metadataBase/openGraph still point here so shared links and
+  // relative asset URLs resolve correctly.
+  metadataBase: new URL("https://app.galeyar.ir"),
   title: "گله‌یار | دستیار هوشمند مدیریت دامداری",
   description: "دستیار هوشمند مدیریت دامداری",
   applicationName: "گله‌یار",
@@ -30,10 +35,14 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  robots: {
+    index: false,
+    follow: false,
+  },
   openGraph: {
     title: "گله‌یار | دستیار هوشمند مدیریت دامداری",
     description: "دستیار هوشمند مدیریت دامداری",
-    url: "https://galeyar.ir",
+    url: "https://app.galeyar.ir",
     siteName: "گله‌یار",
     locale: "fa_IR",
     type: "website",

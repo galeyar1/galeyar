@@ -2,12 +2,12 @@ import type { MetadataRoute } from "next";
 
 export const dynamic = "force-static";
 
-// Every route past the entry point immediately redirects an unauthenticated
-// crawler to /auth/login anyway, so there's nothing sensitive to hide —
-// this just points crawlers at the sitemap rather than disallowing anything.
+// app.galeyar.ir is the private, authenticated livestock-management app —
+// every route requires a session and has nothing worth indexing. The
+// future public marketing site at galeyar.ir will carry its own real
+// robots.txt/sitemap; this one just keeps this domain out of search results.
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: "*", allow: "/" },
-    sitemap: "https://galeyar.ir/sitemap.xml",
+    rules: { userAgent: "*", disallow: "/" },
   };
 }
