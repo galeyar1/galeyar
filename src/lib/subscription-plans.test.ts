@@ -9,6 +9,7 @@ import {
   nextPlan,
   daysRemaining,
   isExpired,
+  effectivePlan,
   PLAN_LABELS,
 } from "@/lib/subscription-plans";
 
@@ -92,5 +93,23 @@ describe("daysRemaining / isExpired", () => {
     expect(isExpired("2026-07-01", "2026-07-25")).toBe(true);
     expect(isExpired("2026-08-01", "2026-07-25")).toBe(false);
     expect(isExpired(null, "2026-07-25")).toBe(false);
+  });
+});
+
+describe("effectivePlan", () => {
+  it("falls back to free once the paid plan has expired", () => {
+    expect(effectivePlan("gold", "2026-07-01", "2026-07-25")).toBe("free");
+  });
+
+  it("keeps the paid plan while still within its expiration date", () => {
+    expect(effectivePlan("gold", "2026-08-01", "2026-07-25")).toBe("gold");
+  });
+
+  it("free with no expiration date is unaffected", () => {
+    expect(effectivePlan("free", null, "2026-07-25")).toBe("free");
+  });
+
+  it("a paid plan with no expiration date (e.g. manually granted) never falls back", () => {
+    expect(effectivePlan("professional", null, "2026-07-25")).toBe("professional");
   });
 });

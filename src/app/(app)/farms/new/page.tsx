@@ -16,7 +16,7 @@ import { toPersianDigits } from "@/lib/jalali";
 export default function NewFarmPage() {
   const router = useRouter();
   const { session } = useAuth();
-  const { plan, loading: planLoading } = useFarmPlan();
+  const { effectivePlan: plan, loading: planLoading } = useFarmPlan();
   const [farmCount, setFarmCount] = useState<number | null>(null);
 
   useEffect(() => {

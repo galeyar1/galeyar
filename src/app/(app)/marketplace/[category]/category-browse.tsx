@@ -22,8 +22,8 @@ type ListingWithFarm = MarketplaceListing & { farms: { farm_name: string } | nul
 
 export function CategoryBrowse({ category }: { category: MarketplaceCategory }) {
   const { profile } = useAuth();
-  const { plan } = useFarmPlan();
-  const canPost = hasFeature(plan, "marketplace_access");
+  const { effectivePlan } = useFarmPlan();
+  const canPost = hasFeature(effectivePlan, "marketplace_access");
 
   const [listings, setListings] = useState<ListingWithFarm[]>([]);
   const [loading, setLoading] = useState(true);

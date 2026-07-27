@@ -31,8 +31,8 @@ export function LockedFeatureCard({ feature }: { feature: SubscriptionFeature })
 
 /** Wraps a page/section: renders children only if the current farm's plan unlocks `feature`, otherwise a paywall. */
 export function FeatureGate({ feature, children }: { feature: SubscriptionFeature; children: React.ReactNode }) {
-  const { plan, loading } = useFarmPlan();
+  const { effectivePlan, loading } = useFarmPlan();
   if (loading) return null;
-  if (!hasFeature(plan, feature)) return <LockedFeatureCard feature={feature} />;
+  if (!hasFeature(effectivePlan, feature)) return <LockedFeatureCard feature={feature} />;
   return <>{children}</>;
 }

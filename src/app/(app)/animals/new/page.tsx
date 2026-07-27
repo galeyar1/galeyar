@@ -82,7 +82,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     [animalId]
   );
 
-  const { plan, loading: planLoading } = useFarmPlan();
+  const { effectivePlan: plan, loading: planLoading } = useFarmPlan();
   const activeAnimalCount = useLiveQuery(async () => {
     if (!profile?.farm_id) return null;
     const rows = await db.animals.where("farm_id").equals(profile.farm_id).toArray();

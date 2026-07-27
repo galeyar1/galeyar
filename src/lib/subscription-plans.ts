@@ -123,3 +123,15 @@ export function isExpired(expiresAt: string | null, today: string): boolean {
   const remaining = daysRemaining(expiresAt, today);
   return remaining !== null && remaining < 0;
 }
+
+/**
+ * The plan actually in effect right now — falls back to "free" once
+ * subscription_expires_at has passed, since farms.plan itself is never
+ * automatically reset (no cron/trigger does that). Every limit/feature
+ * check (isAtAnimalLimit, isAtFarmLimit, hasFeature, planLimits) should
+ * gate on this, not on the raw plan column, or an expired paid farm keeps
+ * full paid-tier access forever.
+ */
+export function effectivePlan(plan: SubscriptionPlan, expiresAt: string | null, today: string): SubscriptionPlan {
+  return isExpired(expiresAt, today) ? "free" : plan;
+}

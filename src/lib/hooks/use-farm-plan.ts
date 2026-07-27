@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
+import { effectivePlan as computeEffectivePlan } from "@/lib/subscription-plans";
+import { todayIso } from "@/lib/jalali";
 import type { SubscriptionPlan } from "@/lib/supabase/types";
 
 export interface FarmPlanInfo {
+  /** The plan stored on farms.plan — for display ("شما پلن X را خریداری کرده‌اید"), even if expired. */
   plan: SubscriptionPlan;
+  /** plan, or "free" if subscription_expires_at has passed — use this for every limit/feature gate. */
+  effectivePlan: SubscriptionPlan;
   subscriptionStartedAt: string | null;
   subscriptionExpiresAt: string | null;
   loading: boolean;
@@ -55,5 +60,12 @@ export function useFarmPlan(): FarmPlanInfo {
     };
   }, [farmId, nonce]);
 
-  return { plan, subscriptionStartedAt, subscriptionExpiresAt, loading, refresh: () => setNonce((n) => n + 1) };
+  return {
+    plan,
+    effectivePlan: computeEffectivePlan(plan, subscriptionExpiresAt, todayIso()),
+    subscriptionStartedAt,
+    subscriptionExpiresAt,
+    loading,
+    refresh: () => setNonce((n) => n + 1),
+  };
 }
