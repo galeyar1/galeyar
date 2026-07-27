@@ -200,14 +200,21 @@ export interface Advertisement {
   updated_at: string;
 }
 
+export type FarmInviteStatus = "pending" | "accepted" | "expired" | "cancelled";
+
 export interface FarmInvite {
   id: string;
   farm_id: string;
-  phone_number: string;
+  phone_number: string | null;
+  email: string | null;
   role: UserRole;
   invited_by: string | null;
+  status: FarmInviteStatus;
+  token: string;
   created_at: string;
+  expires_at: string;
   accepted_at: string | null;
+  cancelled_at: string | null;
 }
 
 export interface Animal {

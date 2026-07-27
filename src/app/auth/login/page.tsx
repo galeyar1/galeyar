@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -96,6 +96,8 @@ function PhoneLoginForm() {
 
 function EmailLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("token");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [submitting, setSubmitting] = useState(false);
 
@@ -104,7 +106,26 @@ function EmailLoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
+  // Arriving from an email invite link — prefill the invited address and
+  // default to the signup tab, since a first-time recipient is the more
+  // common case (an existing user would usually already be signed in).
+  useEffect(() => {
+    if (!inviteToken) return;
+    supabase.rpc("get_invite_by_token", { p_token: inviteToken }).then(({ data }) => {
+      const result = data as { ok: boolean; email?: string } | null;
+      if (result?.ok && result.email) {
+        form.setValue("email", result.email);
+        setMode("signup");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteToken]);
+
   async function routeAfterAuth(userId: string) {
+    if (inviteToken) {
+      router.push(`/auth/accept-invite?token=${inviteToken}`);
+      return;
+    }
     const { data: profile } = await supabase.from("users").select("farm_id").eq("id", userId).single();
     router.push(profile?.farm_id ? "/dashboard" : "/onboarding/farm");
   }
@@ -191,14 +212,17 @@ function EmailLoginForm() {
   );
 }
 
-export default function LoginPage() {
+function LoginPageInner() {
+  const searchParams = useSearchParams();
+  const hasInvite = !!searchParams.get("token");
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 bg-background px-6 py-12">
       <div className="flex flex-col items-center gap-2 text-center">
         <Logo variant="full" size={220} />
       </div>
 
-      <Tabs defaultValue="phone" className="w-full max-w-sm">
+      <Tabs defaultValue={hasInvite ? "email" : "phone"} className="w-full max-w-sm">
         <TabsList className="w-full">
           <TabsTrigger value="phone" className="flex-1">شماره موبایل</TabsTrigger>
           <TabsTrigger value="email" className="flex-1">ایمیل (موقت)</TabsTrigger>
@@ -213,5 +237,13 @@ export default function LoginPage() {
 
       <IosInstallPrompt />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

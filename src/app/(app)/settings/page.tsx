@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { LogOut } from "lucide-react";
+import { LogOut, X, RefreshCw } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -23,9 +24,15 @@ import { IRAN_PROVINCES } from "@/lib/iran-provinces";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { normalizeIranianPhone } from "@/lib/auth/phone";
 import { formatJalali } from "@/lib/jalali";
-import type { Farm, FarmInvite, UserProfile, UserRole } from "@/lib/supabase/types";
+import type { Farm, FarmInvite, FarmInviteStatus, UserProfile, UserRole } from "@/lib/supabase/types";
 
 const INVITABLE_ROLES: UserRole[] = ["operator", "vet", "consultant"];
+const INVITE_STATUS_LABELS: Record<FarmInviteStatus, string> = {
+  pending: "در انتظار",
+  accepted: "پذیرفته‌شده",
+  expired: "منقضی‌شده",
+  cancelled: "لغوشده",
+};
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -36,8 +43,11 @@ export default function SettingsPage() {
   const [farm, setFarm] = useState<Farm | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [invites, setInvites] = useState<FarmInvite[]>([]);
+  const [inviteMethod, setInviteMethod] = useState<"phone" | "email">("email");
   const [invitePhone, setInvitePhone] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("operator");
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? "");
@@ -53,7 +63,8 @@ export default function SettingsPage() {
             .from("farm_invites")
             .select("*")
             .eq("farm_id", profile.farm_id)
-            .is("accepted_at", null)
+            .in("status", ["pending", "expired"])
+            .order("created_at", { ascending: false })
         : Promise.resolve({ data: [] }),
     ]);
     setFarm(farmData ?? null);
@@ -90,7 +101,7 @@ export default function SettingsPage() {
     toast.success("اطلاعات مزرعه ذخیره شد");
   }
 
-  async function sendInvite() {
+  async function sendPhoneInvite() {
     const normalized = normalizeIranianPhone(invitePhone);
     if (!normalized || !profile?.farm_id || !session) {
       toast.error("شماره موبایل معتبر نیست");
@@ -108,6 +119,65 @@ export default function SettingsPage() {
     }
     setInvitePhone("");
     toast.success("دعوت‌نامه ارسال شد. با اولین ورود این شماره به گله‌یار، فعال می‌شود.");
+    void loadFarmData();
+  }
+
+  function isValidEmail(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+
+  async function sendEmailInvite() {
+    if (!isValidEmail(inviteEmail) || !profile?.farm_id || !session) {
+      toast.error("ایمیل معتبر نیست");
+      return;
+    }
+    setSendingInvite(true);
+    const { data, error } = await supabase.functions.invoke("send-farm-invite", {
+      body: { farmId: profile.farm_id, email: inviteEmail, role: inviteRole },
+    });
+    setSendingInvite(false);
+    if (error || (data as { error?: string } | null)?.error) {
+      toast.error(`دعوت ناموفق بود: ${(data as { error?: string } | null)?.error ?? error?.message}`);
+      return;
+    }
+    setInviteEmail("");
+    if ((data as { emailSent?: boolean })?.emailSent === false) {
+      toast.warning("دعوت‌نامه ثبت شد اما ارسال ایمیل ممکن نبود — بعداً دوباره تلاش کنید یا لینک را دستی به‌اشتراک بگذارید.");
+    } else {
+      toast.success("دعوت‌نامه با موفقیت ارسال شد.");
+    }
+    void loadFarmData();
+  }
+
+  async function cancelInvite(invite: FarmInvite) {
+    const { error } = await supabase.from("farm_invites").update({ status: "cancelled", cancelled_at: new Date().toISOString() }).eq("id", invite.id);
+    if (error) {
+      toast.error(`لغو دعوت ناموفق بود: ${error.message}`);
+      return;
+    }
+    toast.success("دعوت لغو شد.");
+    void loadFarmData();
+  }
+
+  async function resendInvite(invite: FarmInvite) {
+    if (!invite.email) return;
+    setSendingInvite(true);
+    // Removed first (not after) — send-farm-invite creates a fresh row via
+    // the same insert path as a brand-new invite, which would otherwise
+    // collide with farm_invites_pending_email_idx's uniqueness on this
+    // exact (farm_id, email, role) while the old row is still "pending".
+    // A resend is a genuinely fresh token + expiry, not a reuse of the old
+    // link, so replacing the row outright is the correct behavior anyway.
+    await supabase.from("farm_invites").delete().eq("id", invite.id);
+    const { data, error } = await supabase.functions.invoke("send-farm-invite", {
+      body: { farmId: invite.farm_id, email: invite.email, role: invite.role },
+    });
+    setSendingInvite(false);
+    if (error || (data as { error?: string } | null)?.error) {
+      toast.error(`ارسال مجدد ناموفق بود: ${(data as { error?: string } | null)?.error ?? error?.message}`);
+      return;
+    }
+    toast.success("دعوت‌نامه دوباره ارسال شد.");
     void loadFarmData();
   }
 
@@ -208,25 +278,59 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-2">
                 <span className="text-sm text-muted-foreground">دعوت‌های در انتظار</span>
                 {invites.map((inv) => (
-                  <div key={inv.id} className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-sm">
-                    <span>{inv.phone_number}</span>
-                    <span className="text-muted-foreground">
-                      {ROLE_LABELS[inv.role]} · {formatJalali(inv.created_at.slice(0, 10))}
-                    </span>
+                  <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg bg-muted/50 p-3 text-sm">
+                    <div className="flex flex-col gap-0.5">
+                      <span dir={inv.email ? undefined : "ltr"}>{inv.email ?? inv.phone_number}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {ROLE_LABELS[inv.role]} · {formatJalali(inv.created_at.slice(0, 10))}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={inv.status === "expired" ? "secondary" : "default"}>{INVITE_STATUS_LABELS[inv.status]}</Badge>
+                      {inv.email && (
+                        <Button variant="ghost" size="icon-sm" aria-label="ارسال مجدد" onClick={() => resendInvite(inv)} disabled={sendingInvite}>
+                          <RefreshCw className="size-4" />
+                        </Button>
+                      )}
+                      {inv.status === "pending" && (
+                        <Button variant="ghost" size="icon-sm" aria-label="لغو دعوت" onClick={() => cancelInvite(inv)}>
+                          <X className="size-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
             <div className="flex flex-col gap-2 border-t border-border pt-3">
-              <label className="text-sm text-muted-foreground">افزودن عضو جدید</label>
-              <Input
-                value={invitePhone}
-                onChange={(e) => setInvitePhone(e.target.value)}
-                placeholder="۰۹۱۲۱۲۳۴۵۶۷"
-                className="h-12 text-lg"
-                dir="ltr"
-              />
+              <label className="text-sm text-muted-foreground">دعوت عضو جدید</label>
+              <Tabs value={inviteMethod} onValueChange={(v) => setInviteMethod(v as "phone" | "email")}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="email" className="flex-1">ایمیل</TabsTrigger>
+                  <TabsTrigger value="phone" className="flex-1">شماره موبایل</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {inviteMethod === "email" ? (
+                <Input
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="ایمیل"
+                  type="email"
+                  className="h-12 text-lg"
+                  dir="ltr"
+                />
+              ) : (
+                <Input
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
+                  placeholder="۰۹۱۲۱۲۳۴۵۶۷"
+                  className="h-12 text-lg"
+                  dir="ltr"
+                />
+              )}
+
               <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as UserRole)}>
                 <SelectTrigger className="h-12 w-full text-lg">
                   <SelectValue />
@@ -239,7 +343,10 @@ export default function SettingsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={sendInvite}>ارسال دعوت</Button>
+
+              <Button onClick={inviteMethod === "email" ? sendEmailInvite : sendPhoneInvite} disabled={sendingInvite}>
+                {sendingInvite ? "در حال ارسال…" : "ارسال دعوت"}
+              </Button>
             </div>
           </CardContent>
         </Card>
