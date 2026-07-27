@@ -194,7 +194,11 @@ Deno.serve(async () => {
         lowFeed.map((f) => ({
           farm_id: farm.id,
           type: "feed_low",
+          source: "ai",
+          priority: (f.days_remaining ?? 0) <= 3 ? "high" : "normal",
+          title: "کمبود موجودی خوراک",
           message: `موجودی ${feedLabelFa(f.feed_type, f.custom_label)} تا حدود ${f.days_remaining} روز دیگر تمام می‌شود.`,
+          target_url: "/feed",
         }))
       );
     }

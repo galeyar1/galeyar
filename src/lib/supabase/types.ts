@@ -29,7 +29,18 @@ export type NotificationType =
   | "subscription_expiring"
   | "marketplace_listing"
   | "premium_feature"
-  | "payment_success";
+  | "payment_success"
+  | "announcement"
+  | "health"
+  | "vaccination"
+  | "breeding"
+  | "lambing"
+  | "feeding"
+  | "inventory"
+  | "financial"
+  | "ai_insight";
+export type NotificationSource = "admin" | "ai" | "system";
+export type NotificationPriority = "low" | "normal" | "high" | "urgent";
 export type DewormingType = "internal" | "external";
 export type FinancialTransactionType = "income" | "expense";
 export type IncomeCategory = "animal_sale" | "milk_sale" | "wool_sale" | "breeding_service" | "other";
@@ -71,6 +82,9 @@ export interface Farm {
   plan: SubscriptionPlan;
   subscription_started_at: string | null;
   subscription_expires_at: string | null;
+  /** Reversible deactivation (distinct from farms_delete_owner's real hard delete) — data is untouched, only hidden from active workflows. */
+  is_active: boolean;
+  deactivated_at: string | null;
 }
 
 /**
@@ -334,7 +348,12 @@ export interface NotificationRow {
   id: string;
   farm_id: string;
   type: NotificationType;
+  title: string | null;
   message: string;
+  source: NotificationSource;
+  priority: NotificationPriority;
+  animal_id: string | null;
+  target_url: string | null;
   is_read: boolean;
   created_at: string;
 }
