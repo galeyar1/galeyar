@@ -154,9 +154,13 @@ function BirthForm({ recordId }: { recordId: string | null }) {
         // Each offspring's predicted_genetics is an independent random draw
         // from the parents' cross distribution (src/lib/genetics-prediction.ts)
         // — not the same fixed value for every sibling — so twins can predict
-        // differently, same as the spec's own worked example.
-        const fatherState = parentGeneticState(father);
-        const motherState = parentGeneticState(mother);
+        // differently, same as the spec's own worked example. That model
+        // (named sheep-breed crosses) only applies to sheep — predicting it
+        // for a goat/cattle/horse/camel litter was the same species-leak bug
+        // as the genetic-test form, just on the birth-record path instead.
+        const isSheep = mother.species === "sheep";
+        const fatherState = isSheep ? parentGeneticState(father) : "unknown";
+        const motherState = isSheep ? parentGeneticState(mother) : "unknown";
 
         for (const [genderCode, count, gender, type] of [
           [GENDER_CODE.male, maleN, "male", maleType] as const,
@@ -229,7 +233,7 @@ function BirthForm({ recordId }: { recordId: string | null }) {
 
       <div className="flex flex-col gap-2">
         <label className="text-base">پدر (اختیاری)</label>
-        <AnimalPicker farmId={profile?.farm_id} value={fatherId} onChange={setFatherId} filter="male" allowNone />
+        <AnimalPicker farmId={profile?.farm_id} value={fatherId} onChange={setFatherId} filter="male" species={mother?.species} allowNone />
       </div>
 
       {matingWarning && (

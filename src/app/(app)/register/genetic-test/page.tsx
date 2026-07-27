@@ -18,7 +18,8 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { todayIso } from "@/lib/jalali";
-import { GENETIC_STATE_LABELS, type GeneticState, geneticScore } from "@/lib/genetics-prediction";
+import { GENETIC_STATE_LABELS, type GeneticState, geneticScore, geneticStatesForSpecies } from "@/lib/genetics-prediction";
+import { SPECIES_LABELS } from "@/lib/animal-labels";
 
 function GeneticTestForm({ recordId }: { recordId: string | null }) {
   const router = useRouter();
@@ -33,6 +34,7 @@ function GeneticTestForm({ recordId }: { recordId: string | null }) {
   const [submitting, setSubmitting] = useState(false);
 
   const existing = useLiveQuery(() => (recordId ? db.genetic_tests.get(recordId) : undefined), [recordId]);
+  const animal = useLiveQuery(() => (animalId ? db.animals.get(animalId) : undefined), [animalId]);
 
   useEffect(() => {
     if (existing) {
@@ -44,6 +46,21 @@ function GeneticTestForm({ recordId }: { recordId: string | null }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing?.id]);
+
+  // The named-breed genetic states (رومانوف/شال/لاکن/افشاری) only make
+  // sense for sheep — this is the actual fix for "genetic test results
+  // show sheep breeds regardless of species": the dropdown now depends on
+  // the SELECTED ANIMAL's real species instead of always listing all 11
+  // states, and clears an out-of-range selection when the animal changes
+  // (e.g. editing a record while switching to a differently-typed animal).
+  const availableStates = animal ? geneticStatesForSpecies(animal.species) : (Object.keys(GENETIC_STATE_LABELS) as GeneticState[]);
+
+  useEffect(() => {
+    if (animal && !availableStates.includes(result)) {
+      setResult("unknown");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animal?.species]);
 
   const canSubmit = animalId && labName.trim().length > 0;
 
@@ -143,11 +160,13 @@ function GeneticTestForm({ recordId }: { recordId: string | null }) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-base">نتیجه</label>
-        <Select value={result} onValueChange={(v) => setResult(v as GeneticState)}>
-          <SelectTrigger className="h-12 w-full text-lg"><SelectValue /></SelectTrigger>
+        <label className="text-base">
+          نتیجه{animal ? ` (${SPECIES_LABELS[animal.species]})` : ""}
+        </label>
+        <Select value={result} onValueChange={(v) => setResult(v as GeneticState)} disabled={!animalId}>
+          <SelectTrigger className="h-12 w-full text-lg"><SelectValue placeholder={!animalId ? "ابتدا دام را انتخاب کنید" : undefined} /></SelectTrigger>
           <SelectContent>
-            {(Object.keys(GENETIC_STATE_LABELS) as GeneticState[]).map((s) => (
+            {availableStates.map((s) => (
               <SelectItem key={s} value={s}>{GENETIC_STATE_LABELS[s]}</SelectItem>
             ))}
           </SelectContent>

@@ -26,6 +26,7 @@ import type { MarketplaceCategory, Species, FeedType, FeedUnit } from "@/lib/sup
 
 function AnimalFields({ attrs, setAttrs }: { attrs: Record<string, string>; setAttrs: (a: Record<string, string>) => void }) {
   const species = (attrs.species as Species) || "sheep";
+  const breedOptions = breedOptionsFor(species);
   return (
     <>
       <Select value={species} onValueChange={(v) => setAttrs({ ...attrs, species: v, breed: "" })}>
@@ -36,14 +37,23 @@ function AnimalFields({ attrs, setAttrs }: { attrs: Record<string, string>; setA
           ))}
         </SelectContent>
       </Select>
-      <Select value={attrs.breed ?? ""} onValueChange={(v) => setAttrs({ ...attrs, breed: v })}>
-        <SelectTrigger className="h-12 w-full text-lg"><SelectValue placeholder="نژاد" /></SelectTrigger>
-        <SelectContent>
-          {(breedOptionsFor(species) ?? []).map((b) => (
-            <SelectItem key={b} value={b}>{b}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {breedOptions ? (
+        <Select value={attrs.breed ?? ""} onValueChange={(v) => setAttrs({ ...attrs, breed: v })}>
+          <SelectTrigger className="h-12 w-full text-lg"><SelectValue placeholder="نژاد" /></SelectTrigger>
+          <SelectContent>
+            {breedOptions.map((b) => (
+              <SelectItem key={b} value={b}>{b}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          value={attrs.breed ?? ""}
+          onChange={(e) => setAttrs({ ...attrs, breed: e.target.value })}
+          placeholder="نژاد (اختیاری)"
+          className="h-12 text-lg"
+        />
+      )}
       <Select value={attrs.gender ?? ""} onValueChange={(v) => setAttrs({ ...attrs, gender: v })}>
         <SelectTrigger className="h-12 w-full text-lg"><SelectValue placeholder="جنسیت" /></SelectTrigger>
         <SelectContent>

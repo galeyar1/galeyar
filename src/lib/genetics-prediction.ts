@@ -7,7 +7,15 @@
  * offspring from the same parents can predict differently, matching the
  * spec's own worked example (SH-125-05-M1 predicted Homozygous, its twin
  * SH-125-05-F1 predicted Heterozygous).
+ *
+ * romanov/romanov_asaf/shall/shall_romanov/lacaune/afshari are named SHEEP
+ * breeds (the Iranian sheep-prolificacy breeding program this feature was
+ * built for) — geneticStatesForSpecies() excludes them for every other
+ * species, which is the fix for "genetic test / breeding predictions show
+ * sheep breeds regardless of the animal's actual species."
  */
+
+import type { Species } from "@/lib/supabase/types";
 
 export type GeneticState =
   | "unknown"
@@ -61,6 +69,23 @@ export const GENETIC_SCORES: Record<GeneticState, number> = {
 
 export function geneticScore(state: GeneticState): number {
   return GENETIC_SCORES[state];
+}
+
+/** The named-breed-cross states, which only make sense for sheep. */
+export const SHEEP_ONLY_GENETIC_STATES: readonly GeneticState[] = [
+  "romanov",
+  "romanov_asaf",
+  "shall",
+  "shall_romanov",
+  "lacaune",
+  "afshari",
+];
+
+/** Which GeneticState options are valid to offer/predict for a given species — sheep gets all 11, every other species only the species-neutral ones (unknown/local/heterozygous/homozygous/other). */
+export function geneticStatesForSpecies(species: Species): GeneticState[] {
+  const all = Object.keys(GENETIC_STATE_LABELS) as GeneticState[];
+  if (species === "sheep") return all;
+  return all.filter((s) => !SHEEP_ONLY_GENETIC_STATES.includes(s));
 }
 
 export type GeneticDistribution = Partial<Record<GeneticState, number>>;

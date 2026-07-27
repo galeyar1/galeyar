@@ -14,19 +14,22 @@ import {
 } from "@/components/ui/sheet";
 import { SPECIES_LABELS } from "@/lib/animal-labels";
 import { cn } from "@/lib/utils";
+import type { Species } from "@/lib/supabase/types";
 
 interface AnimalPickerProps {
   farmId: string | null | undefined;
   value?: string;
   onChange: (animalId: string) => void;
   filter?: "all" | "female" | "male";
+  /** Restricts the list to one species — e.g. a father picker for a litter should only ever offer the same species as the mother, never a cross-species parent. */
+  species?: Species;
   className?: string;
   /** Adds an explicit "هیچکدام" option — e.g. unknown father, AI, external sire. */
   allowNone?: boolean;
 }
 
 /** Full-screen searchable picker — a dropdown is too fiddly one-handed for a long ear-tag list. */
-export function AnimalPicker({ farmId, value, onChange, filter = "all", className, allowNone = false }: AnimalPickerProps) {
+export function AnimalPicker({ farmId, value, onChange, filter = "all", species, className, allowNone = false }: AnimalPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -36,8 +39,9 @@ export function AnimalPicker({ farmId, value, onChange, filter = "all", classNam
     return rows
       .filter((a) => !a.deleted_at && a.status === "active")
       .filter((a) => filter === "all" || a.gender === filter)
+      .filter((a) => !species || a.species === species)
       .sort((a, b) => (a.ear_tag > b.ear_tag ? 1 : -1));
-  }, [farmId, filter]);
+  }, [farmId, filter, species]);
 
   const selected = useMemo(() => animals?.find((a) => a.id === value), [animals, value]);
 
