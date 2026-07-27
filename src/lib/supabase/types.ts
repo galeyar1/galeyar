@@ -73,6 +73,30 @@ export interface Farm {
   subscription_expires_at: string | null;
 }
 
+/**
+ * Admin-editable plan catalog (supabase/migrations/0028_plans_table.sql) —
+ * the authoritative source for limits/features; PLAN_LIMITS/PLAN_FEATURES
+ * in subscription-plans.ts are only the offline/fetch-failure fallback.
+ * `key` (not `name`) is the stable identifier farms.plan/subscriptions
+ * reference — renaming `name` in the admin panel never breaks anything.
+ */
+export interface Plan {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  duration_days: number | null;
+  max_animals: number | null;
+  max_farms: number | null;
+  features: string[];
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type UserAccountStatus = "active" | "suspended";
 
 export interface UserProfile {

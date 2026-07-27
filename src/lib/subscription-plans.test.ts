@@ -62,12 +62,13 @@ describe("plan limits", () => {
     expect(planLimits("professional")).toEqual({ maxAnimals: null, maxFarms: null });
   });
 
-  it("isAtAnimalLimit / isAtFarmLimit respect the cap and unlimited plans", () => {
-    expect(isAtAnimalLimit("free", 30)).toBe(true);
-    expect(isAtAnimalLimit("free", 29)).toBe(false);
-    expect(isAtAnimalLimit("professional", 1_000_000)).toBe(false);
-    expect(isAtFarmLimit("gold", 3)).toBe(true);
-    expect(isAtFarmLimit("gold", 2)).toBe(false);
+  it("isAtAnimalLimit / isAtFarmLimit respect the cap and unlimited plans (accepting a limits object, not just PLAN_LIMITS[plan] — same shape a live-fetched plans-table row would have)", () => {
+    expect(isAtAnimalLimit(planLimits("free"), 30)).toBe(true);
+    expect(isAtAnimalLimit(planLimits("free"), 29)).toBe(false);
+    expect(isAtAnimalLimit(planLimits("professional"), 1_000_000)).toBe(false);
+    expect(isAtFarmLimit(planLimits("gold"), 3)).toBe(true);
+    expect(isAtFarmLimit(planLimits("gold"), 2)).toBe(false);
+    expect(isAtAnimalLimit({ maxAnimals: 5 }, 5)).toBe(true);
   });
 });
 

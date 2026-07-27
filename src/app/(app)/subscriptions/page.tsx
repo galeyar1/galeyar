@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatJalali, todayIso } from "@/lib/jalali";
 import { toPersianDigits } from "@/lib/jalali";
-import { PLAN_ORDER, PLAN_LABELS, PLAN_LIMITS, daysRemaining, isExpired } from "@/lib/subscription-plans";
+import { PLAN_ORDER, PLAN_LABELS, daysRemaining, isExpired } from "@/lib/subscription-plans";
 import { PAYMENT_PROVIDERS, paymentProvider } from "@/lib/payments/provider";
 import type { SubscriptionPlan, PaymentProviderId } from "@/lib/supabase/types";
 
@@ -37,7 +37,7 @@ function generateReferralCode(): string {
 export default function SubscriptionsPage() {
   const { profile, session } = useAuth();
   const farmId = profile?.farm_id;
-  const { plan, subscriptionExpiresAt, loading } = useFarmPlan();
+  const { plan, limits, subscriptionExpiresAt, loading } = useFarmPlan();
   const today = todayIso();
 
   const [upgradeTarget, setUpgradeTarget] = useState<SubscriptionPlan | null>(null);
@@ -265,7 +265,7 @@ export default function SubscriptionsPage() {
       </Dialog>
 
       <p className="text-center text-xs text-muted-foreground">
-        سقف دام‌ها: {toPersianDigits(PLAN_LIMITS[plan].maxAnimals ?? "∞")} · سقف مزرعه‌ها: {toPersianDigits(PLAN_LIMITS[plan].maxFarms ?? "∞")}
+        سقف دام‌ها: {toPersianDigits(limits.maxAnimals ?? "∞")} · سقف مزرعه‌ها: {toPersianDigits(limits.maxFarms ?? "∞")}
       </p>
     </div>
   );

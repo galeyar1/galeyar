@@ -55,8 +55,14 @@ export const FEATURE_LABELS: Record<SubscriptionFeature, string> = {
   financial_intelligence: "هوش مالی",
 };
 
-/** Every feature available at a plan, cumulative (each tier keeps everything below it). */
-const PLAN_FEATURES: Record<SubscriptionPlan, SubscriptionFeature[]> = {
+/**
+ * Every feature available at a plan, cumulative (each tier keeps everything
+ * below it). This is the offline/fetch-failure FALLBACK only — the
+ * admin-editable plans table (supabase/migrations/0028_plans_table.sql,
+ * read live via useFarmPlan()'s `features`) is the authoritative source
+ * while online. Exported so useFarmPlan() can fall back to it directly.
+ */
+export const PLAN_FEATURES_FALLBACK: Record<SubscriptionPlan, SubscriptionFeature[]> = {
   free: [],
   silver: ["reports", "feed_management"],
   gold: ["reports", "feed_management", "ai_assistant", "advanced_reports"],
@@ -75,8 +81,9 @@ const PLAN_FEATURES: Record<SubscriptionPlan, SubscriptionFeature[]> = {
   ],
 };
 
+/** Fallback-only check — prefer checking the live `features` array from useFarmPlan() directly (features.includes(feature)) wherever that's available. */
 export function hasFeature(plan: SubscriptionPlan, feature: SubscriptionFeature): boolean {
-  return PLAN_FEATURES[plan].includes(feature);
+  return PLAN_FEATURES_FALLBACK[plan].includes(feature);
 }
 
 /** The cheapest plan that unlocks a feature — used for the upgrade prompt's target and copy. */
@@ -97,14 +104,13 @@ export function planLimits(plan: SubscriptionPlan): PlanLimits {
   return PLAN_LIMITS[plan];
 }
 
-export function isAtAnimalLimit(plan: SubscriptionPlan, currentActiveCount: number): boolean {
-  const { maxAnimals } = PLAN_LIMITS[plan];
-  return maxAnimals !== null && currentActiveCount >= maxAnimals;
+/** Accepts a limits object directly (live from useFarmPlan(), or PLAN_LIMITS[plan] as a fallback) rather than a plan, so callers aren't tied to the hardcoded table once the live plans table is available. */
+export function isAtAnimalLimit(limits: Pick<PlanLimits, "maxAnimals">, currentActiveCount: number): boolean {
+  return limits.maxAnimals !== null && currentActiveCount >= limits.maxAnimals;
 }
 
-export function isAtFarmLimit(plan: SubscriptionPlan, currentFarmCount: number): boolean {
-  const { maxFarms } = PLAN_LIMITS[plan];
-  return maxFarms !== null && currentFarmCount >= maxFarms;
+export function isAtFarmLimit(limits: Pick<PlanLimits, "maxFarms">, currentFarmCount: number): boolean {
+  return limits.maxFarms !== null && currentFarmCount >= limits.maxFarms;
 }
 
 export function nextPlan(plan: SubscriptionPlan): SubscriptionPlan | null {

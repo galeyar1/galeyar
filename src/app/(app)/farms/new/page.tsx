@@ -10,13 +10,13 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { useFarmPlan } from "@/lib/hooks/use-farm-plan";
-import { isAtFarmLimit, PLAN_LIMITS, PLAN_LABELS } from "@/lib/subscription-plans";
+import { isAtFarmLimit, PLAN_LABELS } from "@/lib/subscription-plans";
 import { toPersianDigits } from "@/lib/jalali";
 
 export default function NewFarmPage() {
   const router = useRouter();
   const { session } = useAuth();
-  const { effectivePlan: plan, loading: planLoading } = useFarmPlan();
+  const { effectivePlan: plan, limits, loading: planLoading } = useFarmPlan();
   const [farmCount, setFarmCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function NewFarmPage() {
 
   if (planLoading || farmCount === null) return null;
 
-  if (isAtFarmLimit(plan, farmCount)) {
+  if (isAtFarmLimit(limits, farmCount)) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <h1 className="text-xl font-bold">ساخت مزرعه جدید</h1>
@@ -38,7 +38,7 @@ export default function NewFarmPage() {
           <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
             <Lock className="size-8 text-muted-foreground" />
             <p className="text-base font-semibold">
-              پلن {PLAN_LABELS[plan]} شما اجازه ثبت حداکثر {toPersianDigits(PLAN_LIMITS[plan].maxFarms ?? 0)} مزرعه را می‌دهد.
+              پلن {PLAN_LABELS[plan]} شما اجازه ثبت حداکثر {toPersianDigits(limits.maxFarms ?? 0)} مزرعه را می‌دهد.
             </p>
             <Button asChild>
               <Link href="/subscriptions">ارتقا پلن</Link>

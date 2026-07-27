@@ -7,6 +7,7 @@ import type {
   FinancialTransaction,
   GeneticTest,
   MilkRecord,
+  Plan,
   SupportTicket,
   SyncableTable,
   Treatment,
@@ -59,6 +60,8 @@ class GaleyarDatabase extends Dexie {
   sync_queue!: Table<SyncQueueItem, number>;
   sync_meta!: Table<SyncMeta, string>;
   profile!: Table<CachedProfile, string>;
+  /** Cached plans table (server is source of truth) — lets offline plan-limit checks still work using the last-fetched values instead of falling all the way back to hardcoded defaults. */
+  plans_cache!: Table<Plan, string>;
 
   constructor() {
     super("galeyar");
@@ -98,6 +101,10 @@ class GaleyarDatabase extends Dexie {
 
     this.version(5).stores({
       genetic_tests: "id, farm_id, animal_id, test_date, sync_status, deleted_at",
+    });
+
+    this.version(6).stores({
+      plans_cache: "key",
     });
   }
 }

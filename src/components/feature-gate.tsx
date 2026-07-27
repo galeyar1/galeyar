@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useFarmPlan } from "@/lib/hooks/use-farm-plan";
 import {
-  hasFeature,
   lockedFeatureMessage,
   requiredPlanForFeature,
   PLAN_LABELS,
@@ -31,8 +30,8 @@ export function LockedFeatureCard({ feature }: { feature: SubscriptionFeature })
 
 /** Wraps a page/section: renders children only if the current farm's plan unlocks `feature`, otherwise a paywall. */
 export function FeatureGate({ feature, children }: { feature: SubscriptionFeature; children: React.ReactNode }) {
-  const { effectivePlan, loading } = useFarmPlan();
+  const { features, loading } = useFarmPlan();
   if (loading) return null;
-  if (!hasFeature(effectivePlan, feature)) return <LockedFeatureCard feature={feature} />;
+  if (!features.includes(feature)) return <LockedFeatureCard feature={feature} />;
   return <>{children}</>;
 }

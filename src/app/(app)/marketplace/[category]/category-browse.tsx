@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toPersianDigits } from "@/lib/jalali";
-import { hasFeature } from "@/lib/subscription-plans";
 import { MARKETPLACE_CATEGORY_LABELS, matchesFilters } from "@/lib/marketplace";
 import { SPECIES_LABELS, breedOptionsFor } from "@/lib/animal-labels";
 import { IRAN_PROVINCES } from "@/lib/iran-provinces";
@@ -22,8 +21,8 @@ type ListingWithFarm = MarketplaceListing & { farms: { farm_name: string } | nul
 
 export function CategoryBrowse({ category }: { category: MarketplaceCategory }) {
   const { profile } = useAuth();
-  const { effectivePlan } = useFarmPlan();
-  const canPost = hasFeature(effectivePlan, "marketplace_access");
+  const { features } = useFarmPlan();
+  const canPost = features.includes("marketplace_access");
 
   const [listings, setListings] = useState<ListingWithFarm[]>([]);
   const [loading, setLoading] = useState(true);

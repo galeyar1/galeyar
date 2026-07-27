@@ -38,7 +38,7 @@ import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS, breedOptionsFor, DEFAULT_BREED
 import { todayIso, toPersianDigits } from "@/lib/jalali";
 import { canBePregnant, computeExpectedBirthDate, MAX_PREGNANCY_MONTH } from "@/lib/pregnancy";
 import { useFarmPlan } from "@/lib/hooks/use-farm-plan";
-import { isAtAnimalLimit, PLAN_LIMITS, PLAN_LABELS } from "@/lib/subscription-plans";
+import { isAtAnimalLimit, PLAN_LABELS } from "@/lib/subscription-plans";
 import type { Species } from "@/lib/supabase/types";
 
 const SPECIES_OPTIONS = Object.keys(SPECIES_LABELS) as Species[];
@@ -82,7 +82,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     [animalId]
   );
 
-  const { effectivePlan: plan, loading: planLoading } = useFarmPlan();
+  const { effectivePlan: plan, limits, loading: planLoading } = useFarmPlan();
   const activeAnimalCount = useLiveQuery(async () => {
     if (!profile?.farm_id) return null;
     const rows = await db.animals.where("farm_id").equals(profile.farm_id).toArray();
@@ -196,7 +196,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     }
   }
 
-  if (!animalId && !planLoading && typeof activeAnimalCount === "number" && isAtAnimalLimit(plan, activeAnimalCount)) {
+  if (!animalId && !planLoading && typeof activeAnimalCount === "number" && isAtAnimalLimit(limits, activeAnimalCount)) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <h1 className="text-xl font-bold">ثبت دام جدید</h1>
@@ -204,7 +204,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
           <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
             <Lock className="size-8 text-muted-foreground" />
             <p className="text-base font-semibold">
-              پلن {PLAN_LABELS[plan]} شما اجازه ثبت حداکثر {toPersianDigits(PLAN_LIMITS[plan].maxAnimals ?? 0)} دام فعال را می‌دهد.
+              پلن {PLAN_LABELS[plan]} شما اجازه ثبت حداکثر {toPersianDigits(limits.maxAnimals ?? 0)} دام فعال را می‌دهد.
             </p>
             <Button asChild>
               <Link href="/subscriptions">ارتقا پلن</Link>
