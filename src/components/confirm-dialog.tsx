@@ -19,15 +19,24 @@ interface ConfirmDialogProps {
   title?: string;
   description?: string;
   onConfirm: () => void | Promise<void>;
+  /** Defaults preserve the original delete-dialog look; pass these to reuse this dialog for non-destructive confirmations (deactivate, reactivate, etc). */
+  confirmLabel?: string;
+  confirmBusyLabel?: string;
+  confirmVariant?: "destructive" | "default";
+  showIcon?: boolean;
 }
 
-/** Standard "آیا از حذف این مورد مطمئن هستید؟" confirmation used before every delete action. */
+/** Standard "آیا از حذف این مورد مطمئن هستید؟" confirmation used before every delete action — extended with optional confirm-label/variant so it also covers non-destructive confirmations. */
 export function ConfirmDialog({
   open,
   onOpenChange,
   title = "حذف این مورد",
   description = "آیا از حذف این مورد مطمئن هستید؟ این عملیات قابل بازگشت نیست.",
   onConfirm,
+  confirmLabel = "حذف",
+  confirmBusyLabel = "در حال حذف…",
+  confirmVariant = "destructive",
+  showIcon = true,
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false);
 
@@ -49,9 +58,9 @@ export function ConfirmDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             انصراف
           </Button>
-          <Button variant="destructive" onClick={handleConfirm} disabled={busy}>
-            <Trash2 className="size-4" />
-            {busy ? "در حال حذف…" : "حذف"}
+          <Button variant={confirmVariant} onClick={handleConfirm} disabled={busy}>
+            {showIcon && <Trash2 className="size-4" />}
+            {busy ? confirmBusyLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
