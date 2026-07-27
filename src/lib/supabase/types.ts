@@ -324,6 +324,18 @@ export interface AiInsight {
   valid_until: string | null;
 }
 
+export interface ClientErrorLog {
+  id: string;
+  farm_id: string | null;
+  user_id: string | null;
+  message: string;
+  stack: string | null;
+  url: string | null;
+  user_agent: string | null;
+  resolved: boolean;
+  created_at: string;
+}
+
 export interface FarmMember {
   id: string;
   farm_id: string;
