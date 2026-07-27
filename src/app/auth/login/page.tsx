@@ -21,6 +21,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { isValidIranianPhone, normalizeIranianPhone } from "@/lib/auth/phone";
 import { Logo } from "@/components/logo";
+import { IosInstallPrompt } from "@/components/ios-install-prompt";
 
 const phoneSchema = z.object({
   phone: z.string().refine(isValidIranianPhone, {
@@ -209,6 +210,8 @@ export default function LoginPage() {
           <EmailLoginForm />
         </TabsContent>
       </Tabs>
+
+      <IosInstallPrompt />
     </div>
   );
 }

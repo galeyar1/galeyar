@@ -1,18 +1,19 @@
-import Image from "next/image";
+import { Rabbit } from "lucide-react";
 
 /**
- * The Galeyar animal mark (horse/ram/cattle) — replaces the generic PawPrint
- * icon everywhere in navigation. It's a raster illustration (not a single-
- * color SVG), so unlike the lucide icons around it, it can't recolor via
- * currentColor for the active/inactive nav state — it always renders in its
- * own green. Active vs. inactive is instead conveyed by the label text
- * color (already the existing pattern).
+ * The Animals/Livestock nav icon — previously a raster PNG brand mark
+ * (public/brand/nav-icon-96.png), which couldn't recolor via currentColor
+ * like every other lucide icon in the nav and looked inconsistent in Dark
+ * Mode (always rendered in its own fixed green). Replaced with a proper
+ * vector icon from the project's existing icon library (lucide-react) —
+ * same choice already used for "livestock" in the admin panel
+ * (galeyar-admin/src/lib/nav.ts), for consistency across both apps.
  *
- * Prop shape matches lucide's icon components (`className` only) so it can
- * drop into the same `<Icon className="size-6" />` call sites without a
- * special case — the className's Tailwind size utility overrides the
- * intrinsic width/height for actual rendering.
+ * Prop shape unchanged (`className` only) so every existing call site
+ * (dashboard, (app)/layout.tsx, register page, navigation-rules.ts) needs
+ * no changes — this now behaves exactly like the lucide icons around it,
+ * including active/inactive/hover color via currentColor.
  */
 export function AnimalNavIcon({ className }: { className?: string }) {
-  return <Image src="/brand/nav-icon-96.png" alt="" width={28} height={28} className={className} unoptimized />;
+  return <Rabbit className={className} />;
 }
