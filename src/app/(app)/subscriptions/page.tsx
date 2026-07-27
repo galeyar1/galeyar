@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatJalali, todayIso } from "@/lib/jalali";
 import { toPersianDigits } from "@/lib/jalali";
-import { PLAN_ORDER, PLAN_LABELS, PLAN_LIMITS, daysRemaining } from "@/lib/subscription-plans";
+import { PLAN_ORDER, PLAN_LABELS, PLAN_LIMITS, daysRemaining, isExpired } from "@/lib/subscription-plans";
 import { PAYMENT_PROVIDERS, paymentProvider } from "@/lib/payments/provider";
 import type { SubscriptionPlan, PaymentProviderId } from "@/lib/supabase/types";
 
@@ -101,16 +101,27 @@ export default function SubscriptionsPage() {
     if (!farmId || !upgradeTarget) return;
     setPaying(providerId);
     try {
-      await supabase.from("payment_transactions").insert({
-        farm_id: farmId,
-        plan: upgradeTarget,
-        amount: 0,
-        provider: providerId,
-        status: "pending",
-        created_by: session?.user.id,
-      });
+      const { data: inserted } = await supabase
+        .from("payment_transactions")
+        .insert({
+          farm_id: farmId,
+          plan: upgradeTarget,
+          amount: 0,
+          provider: providerId,
+          status: "pending",
+          created_by: session?.user.id,
+        })
+        .select("id")
+        .single();
       const result = await paymentProvider(providerId).initiate(0, `${window.location.origin}/subscriptions`);
       toast.info(result.message);
+      // No real gateway exists yet, so initiate() always resolves ok:false —
+      // self-cancel the pending row now instead of leaving it dangling
+      // forever. Only "pending" can transition here at all (RLS: an owner
+      // can never set their own row to "success", see migration 0023).
+      if (!result.ok && inserted) {
+        await supabase.from("payment_transactions").update({ status: "failed" }).eq("id", inserted.id);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "خطا در شروع پرداخت");
     } finally {
@@ -119,6 +130,7 @@ export default function SubscriptionsPage() {
   }
 
   const remaining = daysRemaining(subscriptionExpiresAt, today);
+  const expired = plan !== "free" && isExpired(subscriptionExpiresAt, today);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -126,6 +138,14 @@ export default function SubscriptionsPage() {
         <Crown className="size-6 text-primary" />
         <h1 className="text-xl font-bold">اشتراک‌ها</h1>
       </div>
+
+      {expired && (
+        <Card className="border-destructive">
+          <CardContent className="p-4 text-sm text-destructive">
+            اشتراک پلن {PLAN_LABELS[plan]} شما منقضی شده و اکنون در سطح پلن رایگان هستید — برای بازگرداندن امکانات، پلن را تمدید کنید.
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

@@ -5,8 +5,19 @@ import type { PaymentProviderId } from "@/lib/supabase/types";
  * IMPORTANT: "Do NOT implement real payment gateways at this stage —
  * prepare the architecture only." Every provider below always resolves to
  * a "coming soon" result; swapping in a real ZarinPal/IDPay/NextPay call
- * later only means implementing `initiate`/`verify` for that one provider —
- * callers (src/app/(app)/subscriptions/page.tsx) don't change.
+ * later only means implementing `initiate()` for that one provider — the
+ * caller (src/app/(app)/subscriptions/page.tsx) doesn't change.
+ *
+ * Deliberately no `verify()` here: verifying a transaction with the
+ * gateway's server API and then flipping payment_transactions.status to
+ * "success" MUST happen server-side (a Supabase edge function using
+ * SUPABASE_SERVICE_ROLE_KEY, same pattern as supabase/functions/delete-user)
+ * and must be idempotent — check the row isn't already "success" before
+ * writing, since gateway callbacks/redirects can fire more than once. RLS
+ * migration 0023 already blocks a farm owner from setting their own row's
+ * status to "success" from the client, which is exactly why this can't
+ * live in client-importable code: nothing here should ever be trusted to
+ * decide a payment succeeded.
  */
 
 export interface PaymentInitiateResult {
@@ -19,7 +30,6 @@ export interface PaymentProvider {
   id: PaymentProviderId;
   label: string;
   initiate(amountRial: number, callbackUrl: string): Promise<PaymentInitiateResult>;
-  verify(transactionId: string): Promise<boolean>;
 }
 
 function comingSoonProvider(id: PaymentProviderId, label: string): PaymentProvider {
@@ -28,9 +38,6 @@ function comingSoonProvider(id: PaymentProviderId, label: string): PaymentProvid
     label,
     async initiate() {
       return { ok: false, message: `درگاه پرداخت ${label} به‌زودی فعال می‌شود.` };
-    },
-    async verify() {
-      return false;
     },
   };
 }
