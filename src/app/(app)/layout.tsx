@@ -25,6 +25,7 @@ import { FarmSwitcher } from "@/components/farm-switcher";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
 import { AnimalNavIcon } from "@/components/animal-nav-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { BOTTOM_NAVIGATION, HAMBURGER_MENU } from "@/lib/navigation-rules";
 import type { UserRole } from "@/lib/supabase/types";
@@ -294,6 +295,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
 
           <span className="flex items-center justify-end gap-1">
+            <NotificationBell />
             <ThemeToggle />
             <Button variant="ghost" size="icon" asChild>
               <Link href="/settings">
