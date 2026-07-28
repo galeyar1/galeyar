@@ -132,7 +132,9 @@ function AcceptInviteInner() {
                   <Button asChild size="lg" className="h-12 text-lg">
                     <Link href={`/auth/login?token=${token}`}>ورود یا ثبت‌نام و پذیرفتن دعوت</Link>
                   </Button>
-                  <p className="text-xs text-muted-foreground">با ایمیل «{preview.email}» وارد شوید یا ثبت‌نام کنید.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {preview.email ? `با ایمیل «${preview.email}» وارد شوید یا ثبت‌نام کنید.` : "با هر حساب کاربری که مایلید وارد شوید یا ثبت‌نام کنید."}
+                  </p>
                 </div>
               )}
             </>

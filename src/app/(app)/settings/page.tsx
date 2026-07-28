@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { LogOut, X, RefreshCw } from "lucide-react";
+import { LogOut, X, Copy } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
@@ -43,9 +43,8 @@ export default function SettingsPage() {
   const [farm, setFarm] = useState<Farm | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [invites, setInvites] = useState<FarmInvite[]>([]);
-  const [inviteMethod, setInviteMethod] = useState<"phone" | "email">("email");
+  const [inviteMethod, setInviteMethod] = useState<"phone" | "link">("link");
   const [invitePhone, setInvitePhone] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("operator");
   const [sendingInvite, setSendingInvite] = useState(false);
 
@@ -122,31 +121,49 @@ export default function SettingsPage() {
     void loadFarmData();
   }
 
-  function isValidEmail(value: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  function buildInviteLink(token: string): string {
+    return `${window.location.origin}/auth/accept-invite?token=${token}`;
   }
 
-  async function sendEmailInvite() {
-    if (!isValidEmail(inviteEmail) || !profile?.farm_id || !session) {
-      toast.error("ایمیل معتبر نیست");
-      return;
+  async function copyToClipboard(text: string): Promise<boolean> {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
     }
+  }
+
+  // No email is sent — the owner shares this link manually (WhatsApp/Telegram/
+  // in person). email is left null on purpose: accept_farm_invite only
+  // enforces an email match when one was actually set on the invite, so
+  // whoever opens the link can sign up or log in with any account of their
+  // choosing and still gets the farm/role attached.
+  async function createInviteLink() {
+    if (!profile?.farm_id || !session) return;
     setSendingInvite(true);
-    const { data, error } = await supabase.functions.invoke("send-farm-invite", {
-      body: { farmId: profile.farm_id, email: inviteEmail, role: inviteRole },
-    });
+    const { data, error } = await supabase
+      .from("farm_invites")
+      .insert({ farm_id: profile.farm_id, role: inviteRole, invited_by: session.user.id })
+      .select("token")
+      .single();
     setSendingInvite(false);
-    if (error || (data as { error?: string } | null)?.error) {
-      toast.error(`دعوت ناموفق بود: ${(data as { error?: string } | null)?.error ?? error?.message}`);
+    if (error || !data) {
+      toast.error(`ساخت لینک دعوت ناموفق بود: ${error?.message}`);
       return;
     }
-    setInviteEmail("");
-    if ((data as { emailSent?: boolean })?.emailSent === false) {
-      toast.warning("دعوت‌نامه ثبت شد اما ارسال ایمیل ممکن نبود — بعداً دوباره تلاش کنید یا لینک را دستی به‌اشتراک بگذارید.");
-    } else {
-      toast.success("دعوت‌نامه با موفقیت ارسال شد.");
-    }
+    const link = buildInviteLink(data.token);
+    const copied = await copyToClipboard(link);
+    toast.success(copied ? "لینک دعوت ساخته و در کلیپ‌بورد کپی شد." : "لینک دعوت ساخته شد — از لیست زیر کپی کنید.", {
+      description: link,
+    });
     void loadFarmData();
+  }
+
+  async function copyInviteLink(invite: FarmInvite) {
+    const link = buildInviteLink(invite.token);
+    const copied = await copyToClipboard(link);
+    toast[copied ? "success" : "info"](copied ? "لینک کپی شد." : link);
   }
 
   async function cancelInvite(invite: FarmInvite) {
@@ -156,28 +173,6 @@ export default function SettingsPage() {
       return;
     }
     toast.success("دعوت لغو شد.");
-    void loadFarmData();
-  }
-
-  async function resendInvite(invite: FarmInvite) {
-    if (!invite.email) return;
-    setSendingInvite(true);
-    // Removed first (not after) — send-farm-invite creates a fresh row via
-    // the same insert path as a brand-new invite, which would otherwise
-    // collide with farm_invites_pending_email_idx's uniqueness on this
-    // exact (farm_id, email, role) while the old row is still "pending".
-    // A resend is a genuinely fresh token + expiry, not a reuse of the old
-    // link, so replacing the row outright is the correct behavior anyway.
-    await supabase.from("farm_invites").delete().eq("id", invite.id);
-    const { data, error } = await supabase.functions.invoke("send-farm-invite", {
-      body: { farmId: invite.farm_id, email: invite.email, role: invite.role },
-    });
-    setSendingInvite(false);
-    if (error || (data as { error?: string } | null)?.error) {
-      toast.error(`ارسال مجدد ناموفق بود: ${(data as { error?: string } | null)?.error ?? error?.message}`);
-      return;
-    }
-    toast.success("دعوت‌نامه دوباره ارسال شد.");
     void loadFarmData();
   }
 
@@ -280,16 +275,18 @@ export default function SettingsPage() {
                 {invites.map((inv) => (
                   <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg bg-muted/50 p-3 text-sm">
                     <div className="flex flex-col gap-0.5">
-                      <span dir={inv.email ? undefined : "ltr"}>{inv.email ?? inv.phone_number}</span>
+                      <span dir={inv.phone_number ? "ltr" : undefined}>
+                        {inv.phone_number ?? inv.email ?? "دعوت با لینک"}
+                      </span>
                       <span className="text-xs text-muted-foreground">
                         {ROLE_LABELS[inv.role]} · {formatJalali(inv.created_at.slice(0, 10))}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={inv.status === "expired" ? "secondary" : "default"}>{INVITE_STATUS_LABELS[inv.status]}</Badge>
-                      {inv.email && (
-                        <Button variant="ghost" size="icon-sm" aria-label="ارسال مجدد" onClick={() => resendInvite(inv)} disabled={sendingInvite}>
-                          <RefreshCw className="size-4" />
+                      {inv.status === "pending" && !inv.phone_number && (
+                        <Button variant="ghost" size="icon-sm" aria-label="کپی لینک دعوت" onClick={() => copyInviteLink(inv)}>
+                          <Copy className="size-4" />
                         </Button>
                       )}
                       {inv.status === "pending" && (
@@ -305,23 +302,14 @@ export default function SettingsPage() {
 
             <div className="flex flex-col gap-2 border-t border-border pt-3">
               <label className="text-sm text-muted-foreground">دعوت عضو جدید</label>
-              <Tabs value={inviteMethod} onValueChange={(v) => setInviteMethod(v as "phone" | "email")}>
+              <Tabs value={inviteMethod} onValueChange={(v) => setInviteMethod(v as "phone" | "link")}>
                 <TabsList className="w-full">
-                  <TabsTrigger value="email" className="flex-1">ایمیل</TabsTrigger>
+                  <TabsTrigger value="link" className="flex-1">لینک دعوت</TabsTrigger>
                   <TabsTrigger value="phone" className="flex-1">شماره موبایل</TabsTrigger>
                 </TabsList>
               </Tabs>
 
-              {inviteMethod === "email" ? (
-                <Input
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="ایمیل"
-                  type="email"
-                  className="h-12 text-lg"
-                  dir="ltr"
-                />
-              ) : (
+              {inviteMethod === "phone" && (
                 <Input
                   value={invitePhone}
                   onChange={(e) => setInvitePhone(e.target.value)}
@@ -344,8 +332,14 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
 
-              <Button onClick={inviteMethod === "email" ? sendEmailInvite : sendPhoneInvite} disabled={sendingInvite}>
-                {sendingInvite ? "در حال ارسال…" : "ارسال دعوت"}
+              {inviteMethod === "link" && (
+                <p className="text-xs text-muted-foreground">
+                  با این نقش یک لینک ورود ساخته می‌شود؛ آن را برای فرد موردنظر ارسال کنید — با باز کردنش می‌تواند ثبت‌نام یا وارد شود و مستقیم با همین نقش به مزرعه اضافه می‌شود.
+                </p>
+              )}
+
+              <Button onClick={inviteMethod === "link" ? createInviteLink : sendPhoneInvite} disabled={sendingInvite}>
+                {sendingInvite ? "در حال ساخت…" : inviteMethod === "link" ? "ساخت و کپی لینک دعوت" : "ارسال دعوت"}
               </Button>
             </div>
           </CardContent>

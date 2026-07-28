@@ -106,15 +106,17 @@ function EmailLoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
-  // Arriving from an email invite link — prefill the invited address and
-  // default to the signup tab, since a first-time recipient is the more
-  // common case (an existing user would usually already be signed in).
+  // Arriving from an invite link — default to the signup tab, since a
+  // first-time recipient is the more common case (an existing user would
+  // usually already be signed in). Only prefill the email when the invite
+  // was actually bound to one; a plain shared link (no email set) lets the
+  // recipient sign up or log in with whichever account they want.
   useEffect(() => {
     if (!inviteToken) return;
     supabase.rpc("get_invite_by_token", { p_token: inviteToken }).then(({ data }) => {
       const result = data as { ok: boolean; email?: string } | null;
-      if (result?.ok && result.email) {
-        form.setValue("email", result.email);
+      if (result?.ok) {
+        if (result.email) form.setValue("email", result.email);
         setMode("signup");
       }
     });
