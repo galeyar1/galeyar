@@ -33,6 +33,7 @@ import {
   ANIMAL_STATUS_LABELS,
   effectiveAnimalTypeLabel,
   ageLabel,
+  normalizeAnimalSearch,
 } from "@/lib/animal-labels";
 import { formatJalali, toPersianDigits } from "@/lib/jalali";
 import {
@@ -363,13 +364,15 @@ function PedigreeViewContent({ animalId }: { animalId: string }) {
   }, [animal, farmAnimals, byId, externalRelations, animalId]);
 
   const searchResults = useMemo(() => {
-    const q = searchTerm.trim();
+    const q = normalizeAnimalSearch(searchTerm.trim());
     if (!q || !ancestorTree) return [];
     const pool = [
       ...flattenAncestors(ancestorTree).map((f) => f.animal),
       ...flattenDescendants(descendantTree).map((f) => f.animal),
     ];
-    return pool.filter((a) => [a.ear_tag, a.name ?? "", a.breed ?? ""].some((f) => f.includes(q))).slice(0, 8);
+    return pool
+      .filter((a) => [a.ear_tag, a.name ?? "", a.breed ?? ""].some((f) => normalizeAnimalSearch(f).includes(q)))
+      .slice(0, 8);
   }, [searchTerm, ancestorTree, descendantTree]);
 
   const totalGenerations = ancestorDepth(ancestorTree) + descendantDepth(descendantTree);
@@ -454,22 +457,26 @@ function PedigreeViewContent({ animalId }: { animalId: string }) {
           placeholder="جستجوی هر جد یا فرزند با پلاک، نام یا نژاد…"
           className="h-11 pr-9"
         />
-        {searchResults.length > 0 && (
+        {searchTerm.trim() && (
           <ul className="absolute z-10 mt-1 flex w-full flex-col gap-1 rounded-xl border border-border bg-card p-2 shadow-lg">
-            {searchResults.map((a) => (
-              <li key={a.id}>
-                <Link
-                  href={`/pedigree/view?id=${a.id}`}
-                  className="flex items-center justify-between rounded-lg p-2 hover:bg-muted"
-                >
-                  <span className="font-semibold">
-                    {a.ear_tag}
-                    {a.name ? ` — ${a.name}` : ""}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{a.breed ?? ""}</span>
-                </Link>
-              </li>
-            ))}
+            {searchResults.length > 0 ? (
+              searchResults.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    href={`/pedigree/view?id=${a.id}`}
+                    className="flex items-center justify-between rounded-lg p-2 hover:bg-muted"
+                  >
+                    <span className="font-semibold">
+                      {a.ear_tag}
+                      {a.name ? ` — ${a.name}` : ""}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{a.breed ?? ""}</span>
+                  </Link>
+                </li>
+              ))
+            ) : (
+              <li className="p-2 text-center text-sm text-muted-foreground">دامی با این شماره پلاک پیدا نشد.</li>
+            )}
           </ul>
         )}
       </div>

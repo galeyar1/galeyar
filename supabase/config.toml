@@ -15,7 +15,7 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://galeyar.ir"]
+additional_redirect_urls = ["https://galeyar.ir", "https://app.galeyar.ir", "https://app.galeyar.ir/auth/reset-password"]
 jwt_expiry = 3600
 enable_signup = true
 

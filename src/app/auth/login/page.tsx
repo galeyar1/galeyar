@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -202,13 +203,20 @@ function EmailLoginForm() {
           {submitting ? "در حال بررسی…" : mode === "signup" ? "ثبت‌نام" : "ورود"}
         </Button>
 
-        <button
-          type="button"
-          onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
-          className="text-sm text-primary"
-        >
-          {mode === "signup" ? "قبلاً ثبت‌نام کرده‌اید؟ وارد شوید" : "حساب ندارید؟ ثبت‌نام کنید"}
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
+            className="text-sm text-primary"
+          >
+            {mode === "signup" ? "قبلاً ثبت‌نام کرده‌اید؟ وارد شوید" : "حساب ندارید؟ ثبت‌نام کنید"}
+          </button>
+          {mode === "signin" && (
+            <Link href="/auth/forgot-password" className="text-sm text-muted-foreground">
+              رمز عبور را فراموش کرده‌اید؟
+            </Link>
+          )}
+        </div>
       </form>
     </Form>
   );

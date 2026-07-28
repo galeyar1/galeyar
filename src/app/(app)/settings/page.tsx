@@ -40,6 +40,12 @@ export default function SettingsPage() {
   const isOwner = profile?.role === "owner";
 
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
+  const [usernameInput, setUsernameInput] = useState(profile?.username ?? "");
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
   const [farm, setFarm] = useState<Farm | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [invites, setInvites] = useState<FarmInvite[]>([]);
@@ -53,6 +59,12 @@ export default function SettingsPage() {
   useEffect(() => {
     setFullName(profile?.full_name ?? "");
   }, [profile?.full_name]);
+
+  useEffect(() => {
+    setUsernameInput(profile?.username ?? "");
+  }, [profile?.username]);
+
+  const canChangePassword = session?.user?.app_metadata?.provider === "email";
 
   async function loadFarmData() {
     if (!profile?.farm_id) return;
@@ -87,6 +99,63 @@ export default function SettingsPage() {
     }
     await refreshProfile();
     toast.success("نام ذخیره شد");
+  }
+
+  async function saveUsername() {
+    if (!session) return;
+    const normalized = usernameInput.trim().toLowerCase();
+    if (normalized && !/^[a-z0-9_]{3,20}$/.test(normalized)) {
+      toast.error("نام کاربری باید ۳ تا ۲۰ کاراکتر و فقط شامل حروف انگلیسی، عدد و _ باشد.");
+      return;
+    }
+    setSavingUsername(true);
+    const { error } = await supabase.from("users").update({ username: normalized || null }).eq("id", session.user.id);
+    setSavingUsername(false);
+    if (error) {
+      toast.error(error.code === "23505" ? "این نام کاربری قبلاً استفاده شده است." : `ذخیره نام کاربری ناموفق بود: ${error.message}`);
+      return;
+    }
+    await refreshProfile();
+    toast.success("نام کاربری ذخیره شد.");
+  }
+
+  async function changePassword() {
+    if (!profile?.email) return;
+    if (!currentPassword) {
+      toast.error("رمز عبور فعلی را وارد کنید.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("رمز عبور جدید باید حداقل ۶ کاراکتر باشد.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast.error("تکرار رمز عبور با رمز عبور جدید یکسان نیست.");
+      return;
+    }
+    setChangingPassword(true);
+    // Supabase's client SDK has no direct "verify current password" call —
+    // re-authenticating via signInWithPassword is the standard way to
+    // confirm it before a sensitive credential change.
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+      email: profile.email,
+      password: currentPassword,
+    });
+    if (reauthError) {
+      setChangingPassword(false);
+      toast.error("رمز عبور فعلی اشتباه است.");
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setChangingPassword(false);
+    if (error) {
+      toast.error("تغییر رمز عبور ناموفق بود. لطفاً دوباره تلاش کنید.");
+      return;
+    }
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    toast.success("رمز عبور با موفقیت تغییر کرد.");
   }
 
   async function saveFarm() {
@@ -207,6 +276,72 @@ export default function SettingsPage() {
             <Badge>{profile ? ROLE_LABELS[profile.role] : ""}</Badge>
           </div>
           <Button onClick={saveProfile}>ذخیره پروفایل</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>حساب کاربری و امنیت</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm text-muted-foreground">نام کاربری</label>
+            <Input
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              placeholder="مثلاً: ali_rezaei"
+              className="h-12 text-lg"
+              dir="ltr"
+            />
+            <Button variant="outline" onClick={saveUsername} disabled={savingUsername}>
+              {savingUsername ? "در حال ذخیره…" : "ذخیره نام کاربری"}
+            </Button>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border pt-4">
+            <span className="text-sm font-semibold">تغییر رمز عبور</span>
+            {canChangePassword ? (
+              <>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-muted-foreground">رمز عبور فعلی</label>
+                  <Input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    dir="ltr"
+                    className="h-12 text-lg"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-muted-foreground">رمز عبور جدید</label>
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    dir="ltr"
+                    className="h-12 text-lg"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-muted-foreground">تکرار رمز عبور جدید</label>
+                  <Input
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    dir="ltr"
+                    className="h-12 text-lg"
+                  />
+                </div>
+                <Button onClick={changePassword} disabled={changingPassword}>
+                  {changingPassword ? "در حال تغییر…" : "تغییر رمز عبور"}
+                </Button>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                شما با شماره موبایل وارد می‌شوید — این حساب رمز عبور ندارد و از طریق کد پیامکی وارد می‌شود.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

@@ -120,6 +120,8 @@ export interface UserProfile {
   full_name: string | null;
   phone_number: string | null;
   email: string | null;
+  /** Profile-only identifier — never used for login (GALEYAR authenticates by phone OTP or email+password). Lowercase ASCII/digits/underscore, case-insensitively unique. */
+  username: string | null;
   role: UserRole;
   farm_id: string | null;
   created_at: string;

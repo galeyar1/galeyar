@@ -8,7 +8,7 @@ import { GitBranch, Search } from "lucide-react";
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { Input } from "@/components/ui/input";
-import { SPECIES_LABELS, effectiveAnimalTypeLabel } from "@/lib/animal-labels";
+import { SPECIES_LABELS, effectiveAnimalTypeLabel, normalizeAnimalSearch } from "@/lib/animal-labels";
 import type { Species } from "@/lib/supabase/types";
 
 const SPECIES_ORDER: Species[] = ["sheep", "goat", "cattle", "camel", "horse"];
@@ -30,11 +30,11 @@ export default function PedigreeSearchPage() {
   }, [farmId]);
 
   const filtered = useMemo(() => {
-    const q = query.trim();
+    const q = normalizeAnimalSearch(query.trim());
     const list = animals ?? [];
     if (!q) return list;
     return list.filter((a) =>
-      [a.ear_tag, a.generated_id ?? "", a.name ?? "", a.breed ?? ""].some((f) => f.includes(q))
+      [a.ear_tag, a.generated_id ?? "", a.name ?? "", a.breed ?? ""].some((f) => normalizeAnimalSearch(f).includes(q))
     );
   }, [animals, query]);
 

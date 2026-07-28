@@ -1,4 +1,4 @@
-import { toPersianDigits } from "@/lib/jalali";
+import { toPersianDigits, toAsciiDigits } from "@/lib/jalali";
 import type { Species } from "@/lib/supabase/types";
 
 export const SPECIES_LABELS: Record<Species, string> = {
@@ -8,6 +8,16 @@ export const SPECIES_LABELS: Record<Species, string> = {
   camel: "شتر",
   horse: "اسب",
 };
+
+export const GENDER_LABELS: Record<"male" | "female", string> = {
+  male: "نر",
+  female: "ماده",
+};
+
+/** Normalizes Persian/Arabic digits to Latin and lowercases, so an ear-tag/name/breed search matches regardless of which digit set or letter case the user types. Shared by every animal search UI (AnimalPicker, pedigree). */
+export function normalizeAnimalSearch(value: string): string {
+  return toAsciiDigits(value).toLowerCase();
+}
 
 export interface AnimalTypeOption {
   value: string;
