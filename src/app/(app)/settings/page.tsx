@@ -45,8 +45,10 @@ export default function SettingsPage() {
   const [invites, setInvites] = useState<FarmInvite[]>([]);
   const [inviteMethod, setInviteMethod] = useState<"phone" | "link">("link");
   const [invitePhone, setInvitePhone] = useState("");
+  const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("operator");
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState("");
 
   useEffect(() => {
     setFullName(profile?.full_name ?? "");
@@ -144,7 +146,12 @@ export default function SettingsPage() {
     setSendingInvite(true);
     const { data, error } = await supabase
       .from("farm_invites")
-      .insert({ farm_id: profile.farm_id, role: inviteRole, invited_by: session.user.id })
+      .insert({
+        farm_id: profile.farm_id,
+        role: inviteRole,
+        invited_by: session.user.id,
+        invitee_name: inviteName.trim() || null,
+      })
       .select("token")
       .single();
     setSendingInvite(false);
@@ -153,10 +160,10 @@ export default function SettingsPage() {
       return;
     }
     const link = buildInviteLink(data.token);
+    setGeneratedLink(link);
+    setInviteName("");
     const copied = await copyToClipboard(link);
-    toast.success(copied ? "لینک دعوت ساخته و در کلیپ‌بورد کپی شد." : "لینک دعوت ساخته شد — از لیست زیر کپی کنید.", {
-      description: link,
-    });
+    toast.success(copied ? "لینک دعوت ساخته و در کلیپ‌بورد کپی شد." : "لینک دعوت ساخته شد.");
     void loadFarmData();
   }
 
@@ -275,8 +282,8 @@ export default function SettingsPage() {
                 {invites.map((inv) => (
                   <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg bg-muted/50 p-3 text-sm">
                     <div className="flex flex-col gap-0.5">
-                      <span dir={inv.phone_number ? "ltr" : undefined}>
-                        {inv.phone_number ?? inv.email ?? "دعوت با لینک"}
+                      <span dir={inv.phone_number && !inv.invitee_name ? "ltr" : undefined}>
+                        {inv.invitee_name || inv.phone_number || inv.email || "دعوت با لینک"}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {ROLE_LABELS[inv.role]} · {formatJalali(inv.created_at.slice(0, 10))}
@@ -319,6 +326,15 @@ export default function SettingsPage() {
                 />
               )}
 
+              {inviteMethod === "link" && (
+                <Input
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  placeholder="نام فرد (اختیاری — مثلاً: علی رضایی)"
+                  className="h-12 text-lg"
+                />
+              )}
+
               <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as UserRole)}>
                 <SelectTrigger className="h-12 w-full text-lg">
                   <SelectValue />
@@ -341,6 +357,27 @@ export default function SettingsPage() {
               <Button onClick={inviteMethod === "link" ? createInviteLink : sendPhoneInvite} disabled={sendingInvite}>
                 {sendingInvite ? "در حال ساخت…" : inviteMethod === "link" ? "ساخت و کپی لینک دعوت" : "ارسال دعوت"}
               </Button>
+
+              {inviteMethod === "link" && generatedLink && (
+                <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                  <span className="text-xs text-muted-foreground">لینک دعوت ساخته‌شده — این را برای فرد موردنظر بفرستید:</span>
+                  <div className="flex items-center gap-2">
+                    <Input value={generatedLink} readOnly dir="ltr" className="h-10 flex-1 text-sm" onFocus={(e) => e.target.select()} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="کپی لینک"
+                      onClick={async () => {
+                        const copied = await copyToClipboard(generatedLink);
+                        toast[copied ? "success" : "info"](copied ? "لینک کپی شد." : generatedLink);
+                      }}
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -207,6 +207,7 @@ export interface FarmInvite {
   farm_id: string;
   phone_number: string | null;
   email: string | null;
+  invitee_name: string | null;
   role: UserRole;
   invited_by: string | null;
   status: FarmInviteStatus;
