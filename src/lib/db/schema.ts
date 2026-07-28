@@ -1,6 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import type {
   Animal,
+  AnimalBatch,
   BirthRecord,
   Deworming,
   DiseaseRecord,
@@ -62,6 +63,8 @@ class GaleyarDatabase extends Dexie {
   profile!: Table<CachedProfile, string>;
   /** Cached plans table (server is source of truth) — lets offline plan-limit checks still work using the last-fetched values instead of falling all the way back to hardcoded defaults. */
   plans_cache!: Table<Plan, string>;
+  /** Created only via the bulk_register_animals RPC (never through createRecord) — cached here purely so the batch shows up in offline reads like every other synced table. */
+  animal_batches!: Table<Local<AnimalBatch>, string>;
 
   constructor() {
     super("galeyar");
@@ -105,6 +108,10 @@ class GaleyarDatabase extends Dexie {
 
     this.version(6).stores({
       plans_cache: "key",
+    });
+
+    this.version(7).stores({
+      animal_batches: "id, farm_id, sync_status, deleted_at",
     });
   }
 }

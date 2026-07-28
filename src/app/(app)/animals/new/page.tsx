@@ -28,6 +28,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +40,7 @@ import { todayIso, toPersianDigits } from "@/lib/jalali";
 import { canBePregnant, computeExpectedBirthDate, MAX_PREGNANCY_MONTH } from "@/lib/pregnancy";
 import { useFarmPlan } from "@/lib/hooks/use-farm-plan";
 import { isAtAnimalLimit, PLAN_LABELS } from "@/lib/subscription-plans";
+import { BulkRegisterWizard } from "./bulk-register-wizard";
 import type { Species } from "@/lib/supabase/types";
 
 const SPECIES_OPTIONS = Object.keys(SPECIES_LABELS) as Species[];
@@ -76,6 +78,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
   const router = useRouter();
   const { profile, session } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [mode, setMode] = useState<"single" | "bulk">("single");
 
   const existing = useLiveQuery(
     () => (animalId ? db.animals.get(animalId) : undefined),
@@ -219,6 +222,22 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     <div className="flex flex-col gap-4 p-4">
       <h1 className="text-xl font-bold">{animalId ? "ویرایش دام" : "ثبت دام جدید"}</h1>
 
+      {!animalId && (
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "single" | "bulk")}>
+          <TabsList className="w-full">
+            <TabsTrigger value="single" className="flex-1">
+              ثبت تکی
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="flex-1">
+              ثبت گروهی
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+
+      {!animalId && mode === "bulk" ? (
+        <BulkRegisterWizard />
+      ) : (
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5">
           <FormField
@@ -410,6 +429,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
           </Button>
         </form>
       </Form>
+      )}
     </div>
   );
 }

@@ -52,7 +52,9 @@ export type ExpenseCategory =
   | "salaries"
   | "utilities"
   | "equipment"
+  | "animal_purchase"
   | "other";
+export type AcquisitionType = "purchase" | "born_on_farm" | "transfer" | "other";
 export type SupportTicketCategory = "chat" | "technical" | "veterinary" | "nutrition" | "callback";
 export type SupportTicketPriority = "low" | "normal" | "high" | "urgent";
 export type SupportTicketStatus = "open" | "in_progress" | "resolved" | "closed";
@@ -249,6 +251,29 @@ export interface Animal {
   confirmed_genetics: string | null;
   genetics_source: string | null;
   genetic_score: number | null;
+  /** Set for animals created through Bulk Animal Registration — traceability only, never a substitute for this being a full independent record. */
+  batch_id: string | null;
+  /** How the animal entered the farm — null for every animal registered before Bulk Registration existed. */
+  acquisition_type: AcquisitionType | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+/** A "created together" grouping from Bulk Animal Registration — every animal still has its own independent public.animals row; this is purely a traceability link. */
+export interface AnimalBatch {
+  id: string;
+  farm_id: string;
+  name: string;
+  species: Species;
+  breed: string | null;
+  acquisition_type: AcquisitionType;
+  entry_date: string;
+  quantity: number;
+  notes: string | null;
+  financial_transaction_id: string | null;
+  idempotency_key: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -445,6 +470,8 @@ export interface FinancialTransaction {
   due_date: string | null;
   is_settled: boolean;
   animal_id: string | null;
+  /** Set when this transaction represents one Bulk Animal Registration purchase (not one row per animal). */
+  batch_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -528,4 +555,5 @@ export type SyncableTable =
   | "deworming_records"
   | "financial_transactions"
   | "support_tickets"
-  | "genetic_tests";
+  | "genetic_tests"
+  | "animal_batches";

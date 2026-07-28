@@ -16,6 +16,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   salaries: "حقوق",
   utilities: "قبوض",
   equipment: "تجهیزات",
+  animal_purchase: "خرید دام",
   other: "سایر",
 };
 
