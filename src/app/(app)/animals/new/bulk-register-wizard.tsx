@@ -23,10 +23,12 @@ import { useFarmPlan } from "@/lib/hooks/use-farm-plan";
 import { isAtAnimalLimit, PLAN_LABELS } from "@/lib/subscription-plans";
 import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS, breedOptionsFor, DEFAULT_BREED } from "@/lib/animal-labels";
 import { ACQUISITION_TYPE_LABELS } from "@/lib/acquisition-type";
+import { estimateBirthDateFromAgeMonths, isValidAgeMonths } from "@/lib/animal-age";
 import { todayIso, toPersianDigits, isoToJalali, JALALI_MONTHS } from "@/lib/jalali";
 import type { Animal, AcquisitionType, Species } from "@/lib/supabase/types";
 
 type WizardStep = "shared" | "tags" | "preview" | "confirm" | "success";
+type AgeMode = "birth_date" | "age_months";
 
 interface PreviewAnimal {
   key: string;
@@ -35,6 +37,7 @@ interface PreviewAnimal {
   breed: string;
   weight: string;
   birth_date: string;
+  age_months: string;
   notes: string;
 }
 
@@ -85,6 +88,9 @@ export function BulkRegisterWizard() {
   const [quantity, setQuantity] = useState("25");
   const [entryDate, setEntryDate] = useState(todayIso());
   const [avgWeight, setAvgWeight] = useState("");
+  const [ageMode, setAgeMode] = useState<AgeMode>("age_months");
+  const [sharedAgeMonths, setSharedAgeMonths] = useState("");
+  const [sharedBirthDate, setSharedBirthDate] = useState("");
   const [sharedNotes, setSharedNotes] = useState("");
   const [acquisitionType, setAcquisitionType] = useState<AcquisitionType>("purchase");
 
@@ -204,7 +210,8 @@ export function BulkRegisterWizard() {
       animal_type: animalType,
       breed,
       weight: avgWeight,
-      birth_date: "",
+      birth_date: sharedBirthDate,
+      age_months: sharedAgeMonths,
       notes: "",
     }));
   }
@@ -279,15 +286,22 @@ export function BulkRegisterWizard() {
         p_acquisition_type: acquisitionType,
         p_entry_date: entryDate,
         p_notes: sharedNotes.trim() || null,
-        p_animals: animals.map((a) => ({
-          ear_tag: a.ear_tag.trim(),
-          animal_type: a.animal_type,
-          gender: typeOptions.find((t) => t.value === a.animal_type)?.gender ?? null,
-          breed: a.breed || null,
-          birth_date: a.birth_date || null,
-          weight: a.weight || null,
-          notes: a.notes.trim() || null,
-        })),
+        p_animals: animals.map((a) => {
+          const useAgeMonths = ageMode === "age_months" && a.age_months && isValidAgeMonths(a.age_months);
+          const birthDate = useAgeMonths
+            ? estimateBirthDateFromAgeMonths(Number(a.age_months), entryDate)
+            : a.birth_date || null;
+          return {
+            ear_tag: a.ear_tag.trim(),
+            animal_type: a.animal_type,
+            gender: typeOptions.find((t) => t.value === a.animal_type)?.gender ?? null,
+            breed: a.breed || null,
+            birth_date: birthDate,
+            birth_date_is_estimated: !!useAgeMonths,
+            weight: a.weight || null,
+            notes: a.notes.trim() || null,
+          };
+        }),
         p_purchase: purchasePayload,
       });
 
@@ -449,6 +463,39 @@ export function BulkRegisterWizard() {
               onChange={(e) => setAvgWeight(e.target.value)}
               className="h-12 text-lg"
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-base">سن یا تاریخ تولد (اختیاری)</label>
+            <Tabs value={ageMode} onValueChange={(v) => setAgeMode(v as AgeMode)}>
+              <TabsList className="w-full">
+                <TabsTrigger value="age_months" className="flex-1">
+                  سن به ماه
+                </TabsTrigger>
+                <TabsTrigger value="birth_date" className="flex-1">
+                  تاریخ تولد
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {ageMode === "age_months" ? (
+              <>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="سن تقریبی (ماه)"
+                  value={sharedAgeMonths}
+                  onChange={(e) => setSharedAgeMonths(e.target.value)}
+                  className="h-12 text-lg"
+                />
+                {sharedAgeMonths && isValidAgeMonths(sharedAgeMonths) && (
+                  <p className="text-xs text-muted-foreground">
+                    تاریخ تولد تقریبی: {estimateBirthDateFromAgeMonths(Number(sharedAgeMonths), entryDate)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <PersianDatePicker value={sharedBirthDate} onChange={(iso) => setSharedBirthDate(iso ?? "")} className="h-12 text-lg" />
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -665,12 +712,23 @@ export function BulkRegisterWizard() {
                       />
                     </div>
 
-                    <PersianDatePicker
-                      value={a.birth_date}
-                      onChange={(iso) => updateAnimal(a.key, { birth_date: iso ?? "" })}
-                      placeholder="تاریخ تولد تقریبی (اختیاری)"
-                      className="h-10 text-base"
-                    />
+                    {ageMode === "age_months" ? (
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        value={a.age_months}
+                        onChange={(e) => updateAnimal(a.key, { age_months: e.target.value })}
+                        placeholder="سن (ماه)"
+                        className="h-10 text-base"
+                      />
+                    ) : (
+                      <PersianDatePicker
+                        value={a.birth_date}
+                        onChange={(iso) => updateAnimal(a.key, { birth_date: iso ?? "" })}
+                        placeholder="تاریخ تولد (اختیاری)"
+                        className="h-10 text-base"
+                      />
+                    )}
                   </CardContent>
                 </Card>
               );

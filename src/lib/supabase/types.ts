@@ -232,6 +232,8 @@ export interface Animal {
   breed: string | null;
   gender: string | null;
   birth_date: string | null;
+  /** True when birth_date was derived from an approximate "age in months" the farmer entered, rather than an exact known date — never overwrite an exact date with a later re-estimate. */
+  birth_date_is_estimated: boolean;
   father_id: string | null;
   mother_id: string | null;
   status: AnimalStatus;

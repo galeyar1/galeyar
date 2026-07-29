@@ -36,29 +36,53 @@ import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
 import { ANIMAL_TYPES_BY_SPECIES, SPECIES_LABELS, breedOptionsFor, DEFAULT_BREED } from "@/lib/animal-labels";
+import { ACQUISITION_TYPE_LABELS } from "@/lib/acquisition-type";
+import { estimateBirthDateFromAgeMonths, isValidAgeMonths, MAX_AGE_MONTHS } from "@/lib/animal-age";
 import { todayIso, toPersianDigits } from "@/lib/jalali";
 import { canBePregnant, computeExpectedBirthDate, MAX_PREGNANCY_MONTH } from "@/lib/pregnancy";
 import { useFarmPlan } from "@/lib/hooks/use-farm-plan";
 import { isAtAnimalLimit, PLAN_LABELS } from "@/lib/subscription-plans";
 import { BulkRegisterWizard } from "./bulk-register-wizard";
-import type { Species } from "@/lib/supabase/types";
+import type { AcquisitionType, Species } from "@/lib/supabase/types";
 
 const SPECIES_OPTIONS = Object.keys(SPECIES_LABELS) as Species[];
+const ACQUISITION_OPTIONS: AcquisitionType[] = ["purchase", "born_on_farm", "transfer", "other"];
 
-const schema = z.object({
-  ear_tag: z.string().min(1, "شماره پلاک گوش الزامی است"),
-  name: z.string().optional(),
-  species: z.enum(["sheep", "goat", "cattle", "camel", "horse"]),
-  animal_type: z.string().min(1, "انتخاب نوع و جنسیت دام الزامی است"),
-  breed: z.string().optional(),
-  birth_date: z
-    .string()
-    .optional()
-    .refine((v) => !v || v <= todayIso(), { message: "تاریخ تولد نمی‌تواند در آینده باشد" }),
-  is_pregnant: z.boolean().optional(),
-  pregnancy_month: z.string().optional(),
-  notes: z.string().optional(),
-});
+const schema = z
+  .object({
+    ear_tag: z.string().min(1, "شماره پلاک گوش الزامی است"),
+    name: z.string().optional(),
+    species: z.enum(["sheep", "goat", "cattle", "camel", "horse"]),
+    animal_type: z.string().min(1, "انتخاب نوع و جنسیت دام الزامی است"),
+    breed: z.string().optional(),
+    ageEntryMode: z.enum(["birth_date", "age_months"]),
+    birth_date: z
+      .string()
+      .optional()
+      .refine((v) => !v || v <= todayIso(), { message: "تاریخ تولد نمی‌تواند در آینده باشد" }),
+    age_months: z.string().optional(),
+    weight: z.string().optional(),
+    is_pregnant: z.boolean().optional(),
+    pregnancy_month: z.string().optional(),
+    acquisition_type: z.enum(["purchase", "born_on_farm", "transfer", "other"]),
+    purchase_price: z.string().optional(),
+    purchase_date: z.string().optional(),
+    seller: z.string().optional(),
+    purchase_notes: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .refine((v) => v.ageEntryMode !== "age_months" || !v.age_months || isValidAgeMonths(v.age_months), {
+    message: `سن باید بین ۰ تا ${MAX_AGE_MONTHS} ماه باشد`,
+    path: ["age_months"],
+  })
+  .refine((v) => !v.weight || (Number(v.weight) > 0 && Number.isFinite(Number(v.weight))), {
+    message: "وزن باید عددی بزرگ‌تر از صفر باشد",
+    path: ["weight"],
+  })
+  .refine((v) => !v.purchase_price || Number(v.purchase_price) >= 0, {
+    message: "قیمت خرید نمی‌تواند منفی باشد",
+    path: ["purchase_price"],
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -68,9 +92,17 @@ const EMPTY_VALUES: FormValues = {
   species: "sheep",
   animal_type: "",
   breed: DEFAULT_BREED,
+  ageEntryMode: "birth_date",
   birth_date: "",
+  age_months: "",
+  weight: "",
   is_pregnant: false,
   pregnancy_month: "",
+  acquisition_type: "other",
+  purchase_price: "",
+  purchase_date: todayIso(),
+  seller: "",
+  purchase_notes: "",
   notes: "",
 };
 
@@ -100,14 +132,19 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
   useEffect(() => {
     if (existing) {
       form.reset({
+        ...EMPTY_VALUES,
         ear_tag: existing.ear_tag,
         name: existing.name ?? "",
         species: existing.species,
         animal_type: existing.animal_type ?? "",
         breed: existing.breed ?? "",
+        // Editing always shows the exact birth_date field — age-in-months is
+        // only a creation-time input convenience, never re-derived on edit.
+        ageEntryMode: "birth_date",
         birth_date: existing.birth_date ?? "",
         is_pregnant: existing.is_pregnant ?? false,
         pregnancy_month: existing.pregnancy_month ? String(existing.pregnancy_month) : "",
+        acquisition_type: (existing.acquisition_type as FormValues["acquisition_type"]) ?? "other",
         notes: existing.notes ?? "",
       });
     }
@@ -117,6 +154,8 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
   const species = form.watch("species");
   const animalType = form.watch("animal_type");
   const isPregnant = form.watch("is_pregnant");
+  const ageEntryMode = form.watch("ageEntryMode");
+  const acquisitionType = form.watch("acquisition_type");
   const typeOptions = ANIMAL_TYPES_BY_SPECIES[species];
   const breedOptions = breedOptionsFor(species);
   const pregnancyEligible = canBePregnant(species, animalType);
@@ -145,6 +184,15 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
     const pregnant = eligible && !!values.is_pregnant && !!values.pregnancy_month;
     const pregnancyMonthNum = pregnant ? Number(values.pregnancy_month) : null;
 
+    // Age-in-months is only ever a creation-time input convenience — edit
+    // mode always uses ageEntryMode "birth_date", so this only estimates
+    // when the user actually picked that mode while registering.
+    const usingAgeMonths =
+      !animalId && values.ageEntryMode === "age_months" && values.age_months && isValidAgeMonths(values.age_months);
+    const birthDate = usingAgeMonths
+      ? estimateBirthDateFromAgeMonths(Number(values.age_months), todayIso())
+      : values.birth_date || null;
+
     const payload = {
       ear_tag: values.ear_tag,
       name: values.name || null,
@@ -152,12 +200,14 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
       animal_type: values.animal_type || null,
       breed: values.breed || null,
       gender: selectedType?.gender ?? null,
-      birth_date: values.birth_date || null,
+      birth_date: birthDate,
+      birth_date_is_estimated: !!usingAgeMonths,
       is_pregnant: pregnant,
       pregnancy_month: pregnancyMonthNum,
       expected_birth_date: pregnant
         ? computeExpectedBirthDate(values.species, pregnancyMonthNum!, todayIso())
         : null,
+      acquisition_type: values.acquisition_type,
       notes: values.notes || null,
     };
 
@@ -172,6 +222,7 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
           ...payload,
           father_id: null,
           mother_id: null,
+          batch_id: null,
           status: "active",
           // Only animals auto-created from a birth record get a generated_id
           // or a predicted genetics value.
@@ -185,6 +236,30 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
           genetics_source: null,
           genetic_score: null,
         });
+
+        if (values.weight && Number(values.weight) > 0) {
+          await createRecord("weight_records", profile.farm_id, session.user.id, {
+            animal_id: newId,
+            weight: Number(values.weight),
+            record_date: todayIso(),
+          });
+        }
+
+        if (values.acquisition_type === "purchase" && values.purchase_price && Number(values.purchase_price) >= 0) {
+          await createRecord("financial_transactions", profile.farm_id, session.user.id, {
+            type: "expense",
+            category: "animal_purchase",
+            amount: Number(values.purchase_price),
+            transaction_date: values.purchase_date || todayIso(),
+            description: values.purchase_notes || null,
+            party_name: values.seller || null,
+            animal_id: newId,
+            batch_id: null,
+            due_date: null,
+            is_settled: true,
+          });
+        }
+
         console.log("[animals/new] create succeeded", newId);
         toast.success("دام با موفقیت ثبت شد");
         router.push("/animals");
@@ -351,22 +426,186 @@ function AnimalFormPage({ animalId }: { animalId: string | null }) {
             )}
           />
 
+          {animalId ? (
+            <FormField
+              control={form.control}
+              name="birth_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base">تاریخ تولد (اختیاری)</FormLabel>
+                  <FormControl>
+                    <PersianDatePicker
+                      value={field.value}
+                      onChange={(iso) => field.onChange(iso ?? "")}
+                      className="h-12 text-lg"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              <FormField
+                control={form.control}
+                name="ageEntryMode"
+                render={({ field }) => (
+                  <Tabs value={field.value} onValueChange={field.onChange}>
+                    <TabsList className="w-full">
+                      <TabsTrigger value="birth_date" className="flex-1">
+                        تاریخ تولد
+                      </TabsTrigger>
+                      <TabsTrigger value="age_months" className="flex-1">
+                        سن به ماه
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
+              />
+
+              {ageEntryMode === "birth_date" ? (
+                <FormField
+                  control={form.control}
+                  name="birth_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base">تاریخ تولد (اختیاری)</FormLabel>
+                      <FormControl>
+                        <PersianDatePicker
+                          value={field.value}
+                          onChange={(iso) => field.onChange(iso ?? "")}
+                          className="h-12 text-lg"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="age_months"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base">سن به ماه (اختیاری)</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" inputMode="numeric" min={0} className="h-12 text-lg" />
+                      </FormControl>
+                      <FormMessage />
+                      {!!field.value && isValidAgeMonths(field.value) && (
+                        <p className="text-xs text-muted-foreground">
+                          تاریخ تولد تقریبی: {estimateBirthDateFromAgeMonths(Number(field.value), todayIso())}
+                        </p>
+                      )}
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+          )}
+
           <FormField
             control={form.control}
-            name="birth_date"
+            name="acquisition_type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-base">تاریخ تولد (اختیاری)</FormLabel>
-                <FormControl>
-                  <PersianDatePicker
-                    value={field.value}
-                    onChange={(iso) => field.onChange(iso ?? "")}
-                    className="h-12 text-lg"
-                  />
-                </FormControl>
+                <FormLabel className="text-base">نحوه ورود به گله</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="h-12 w-full text-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {ACQUISITION_OPTIONS.map((a) => (
+                      <SelectItem key={a} value={a}>
+                        {ACQUISITION_TYPE_LABELS[a]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </FormItem>
             )}
           />
+
+          {!animalId && acquisitionType === "purchase" && (
+            <Card>
+              <CardContent className="flex flex-col gap-3 p-4">
+                <h3 className="font-semibold">اطلاعات خرید (اختیاری)</h3>
+
+                <FormField
+                  control={form.control}
+                  name="purchase_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm text-muted-foreground">قیمت خرید (تومان)</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" inputMode="numeric" className="h-12 text-lg" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="purchase_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm text-muted-foreground">تاریخ خرید</FormLabel>
+                      <FormControl>
+                        <PersianDatePicker
+                          value={field.value}
+                          onChange={(iso) => field.onChange(iso ?? todayIso())}
+                          className="h-12 text-lg"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="seller"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm text-muted-foreground">فروشنده (اختیاری)</FormLabel>
+                      <FormControl>
+                        <Input {...field} className="h-12 text-lg" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="purchase_notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm text-muted-foreground">توضیحات خرید (اختیاری)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} rows={2} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {!animalId && (
+            <FormField
+              control={form.control}
+              name="weight"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base">وزن (کیلوگرم، اختیاری)</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="number" inputMode="decimal" className="h-12 text-lg" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
 
           {pregnancyEligible && (
             <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted p-3">
