@@ -177,7 +177,7 @@ function NodeInfoSheet({ animalId, onClose }: { animalId: string | null; onClose
 
   return (
     <Sheet open={!!animalId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
+      <SheetContent side="bottom" className="h-[85dvh]! overflow-y-auto! pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <SheetHeader>
           <SheetTitle>
             {animal ? `${animal.ear_tag}${animal.name ? ` — ${animal.name}` : ""}` : "در حال بارگذاری…"}

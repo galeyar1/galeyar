@@ -101,18 +101,26 @@ export function AnimalPicker({
 
       <Sheet open={open} onOpenChange={setOpen}>
         {/*
-          Root cause of the "list looks stuck / can't reach the bottom"
-          bug on iPhone Safari: 85vh is computed against the LAYOUT
-          viewport, which stays the full screen height even while
-          Safari's collapsible toolbar is actually visible — so a chunk
-          of the sheet (including part of the scrollable list) rendered
-          below the true visible/touchable area. 85dvh tracks the real
-          visual viewport and shrinks/grows with the toolbar, so the
-          whole sheet — and therefore the whole list — is always within
-          reach. The safe-area padding keeps the last row clear of the
-          home-indicator area on notched iPhones.
+          Actual root cause of "the list is stuck / nothing scrolls, no
+          close button visible": SheetContent's own base classes include
+          `data-[side=bottom]:h-auto`, which — because it combines a class
+          with a `[data-side=bottom]` attribute selector — has HIGHER CSS
+          specificity (0,2,0) than a plain override class like `h-[85dvh]`
+          (0,1,0). That base rule was silently winning regardless of
+          source order, so the sheet was always auto-height: bottom-anchored
+          and exactly as tall as its content. Once the checkbox/animal list
+          got long, the box grew taller than the screen while staying
+          glued to the bottom edge — pushing the header, search box, and
+          close button UPWARD, off the top of the screen, with no scroll
+          container bounded anywhere to bring them back. The trailing `!`
+          (Tailwind's important-modifier syntax) forces this height (and
+          overflow-hidden) to win outright, no matter the specificity race.
+          85dvh (not 85vh) additionally tracks Safari's real visual
+          viewport as its toolbar collapses/expands, and the safe-area
+          padding below keeps the last row clear of the home-indicator
+          area on notched iPhones.
         */}
-        <SheetContent side="bottom" className="flex h-[85dvh] flex-col">
+        <SheetContent side="bottom" className="flex h-[85dvh]! flex-col overflow-hidden!">
           <SheetHeader>
             <SheetTitle>انتخاب شماره پلاک گوش</SheetTitle>
           </SheetHeader>

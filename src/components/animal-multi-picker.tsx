@@ -96,7 +96,7 @@ export function AnimalMultiPicker({ farmId, selectedIds, onChange, includeInacti
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" className="flex h-[85dvh] flex-col">
+        <SheetContent side="bottom" className="flex h-[85dvh]! flex-col overflow-hidden!">
           <SheetHeader>
             <SheetTitle>انتخاب دام‌ها</SheetTitle>
           </SheetHeader>
