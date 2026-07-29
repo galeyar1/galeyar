@@ -11,10 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { PersianDatePicker } from "@/components/ui/persian-date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnimalPicker } from "@/components/animal-picker";
+import { AnimalMultiPicker } from "@/components/animal-multi-picker";
 import { db } from "@/lib/db/schema";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createRecord, updateRecord } from "@/lib/sync/repository";
-import { todayIso } from "@/lib/jalali";
+import { todayIso, toPersianDigits } from "@/lib/jalali";
 import type { DewormingType } from "@/lib/supabase/types";
 
 const DEWORMING_TYPE_LABELS: Record<DewormingType, string> = {
@@ -26,6 +27,7 @@ function DewormingForm({ recordId }: { recordId: string | null }) {
   const router = useRouter();
   const { profile, session } = useAuth();
   const [animalId, setAnimalId] = useState("");
+  const [animalIds, setAnimalIds] = useState<string[]>([]);
   const [dewormingType, setDewormingType] = useState<DewormingType>("internal");
   const [productName, setProductName] = useState("");
   const [dateGiven, setDateGiven] = useState(todayIso());
@@ -47,15 +49,17 @@ function DewormingForm({ recordId }: { recordId: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing?.id]);
 
-  const canSubmit = animalId && productName.trim().length > 0;
+  // Editing an existing record is inherently single-animal (it already
+  // belongs to one animal); only a brand-new submission can be a group.
+  const canSubmit = recordId ? !!animalId && productName.trim().length > 0 : animalIds.length > 0 && productName.trim().length > 0;
 
   async function onSubmit() {
     if (!profile?.farm_id || !session || !canSubmit) return;
+    const farmId = profile.farm_id;
     setSubmitting(true);
-    console.log("[register/deworming] submitting", { recordId, animalId, dewormingType, productName, dateGiven });
+    console.log("[register/deworming] submitting", { recordId, animalId, animalIds, dewormingType, productName, dateGiven });
 
-    const payload = {
-      animal_id: animalId,
+    const shared = {
       deworming_type: dewormingType,
       product_name: productName.trim(),
       date_given: dateGiven,
@@ -65,11 +69,25 @@ function DewormingForm({ recordId }: { recordId: string | null }) {
 
     try {
       if (recordId) {
-        await updateRecord("deworming_records", recordId, payload);
+        await updateRecord("deworming_records", recordId, { ...shared, animal_id: animalId });
         toast.success("ضدانگل به‌روزرسانی شد");
       } else {
-        await createRecord("deworming_records", profile.farm_id, session.user.id, payload);
-        toast.success("ضدانگل با موفقیت ثبت شد");
+        // A group identifier only matters (and is only created) for an
+        // actual group submission — a single-animal record stays exactly
+        // as before, with no batch concept attached.
+        const treatmentBatchId = animalIds.length > 1 ? crypto.randomUUID() : null;
+        await Promise.all(
+          animalIds.map((id) =>
+            createRecord("deworming_records", farmId, session.user.id, {
+              ...shared,
+              animal_id: id,
+              treatment_batch_id: treatmentBatchId,
+            })
+          )
+        );
+        toast.success(
+          animalIds.length > 1 ? `ضدانگل برای ${toPersianDigits(animalIds.length)} دام ثبت شد` : "ضدانگل با موفقیت ثبت شد"
+        );
       }
       router.push("/register");
     } catch (error) {
@@ -85,8 +103,12 @@ function DewormingForm({ recordId }: { recordId: string | null }) {
       <h1 className="text-xl font-bold">{recordId ? "ویرایش ضد انگل" : "ثبت ضد انگل"}</h1>
 
       <div className="flex flex-col gap-2">
-        <label className="text-base">دام *</label>
-        <AnimalPicker farmId={profile?.farm_id} value={animalId} onChange={setAnimalId} />
+        <label className="text-base">{recordId ? "دام *" : "انتخاب دام‌ها *"}</label>
+        {recordId ? (
+          <AnimalPicker farmId={profile?.farm_id} value={animalId} onChange={setAnimalId} />
+        ) : (
+          <AnimalMultiPicker farmId={profile?.farm_id} selectedIds={animalIds} onChange={setAnimalIds} />
+        )}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -127,7 +149,13 @@ function DewormingForm({ recordId }: { recordId: string | null }) {
       </div>
 
       <Button size="lg" className="h-14 text-lg" disabled={!canSubmit || submitting} onClick={onSubmit}>
-        {submitting ? "در حال ثبت…" : recordId ? "ذخیره تغییرات" : "ثبت ضد انگل"}
+        {submitting
+          ? "در حال ثبت…"
+          : recordId
+            ? "ذخیره تغییرات"
+            : animalIds.length > 1
+              ? `ثبت ضد انگل برای ${toPersianDigits(animalIds.length)} دام`
+              : "ثبت ضد انگل"}
       </Button>
     </div>
   );

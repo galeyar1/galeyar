@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import { updateRecord } from "@/lib/sync/repository";
 import { AnimalPicker } from "@/components/animal-picker";
+import { HerdCompositionAlert } from "@/components/herd-composition-alert";
 import { FeatureGate } from "@/components/feature-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -283,6 +284,8 @@ function GeneticIntelligencePageContent() {
           </CardContent>
         </Card>
       </div>
+
+      {farmId && <HerdCompositionAlert farmId={farmId} />}
 
       <Card>
         <CardHeader>

@@ -455,6 +455,8 @@ export interface Deworming {
   date_given: string;
   next_due_date: string | null;
   notes: string | null;
+  /** Set when this record was created as part of a group deworming submission — a traceability link only, never a substitute for this animal's own independent record. */
+  treatment_batch_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

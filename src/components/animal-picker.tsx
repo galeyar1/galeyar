@@ -1,10 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
 import { ChevronDown, Search, Ban } from "lucide-react";
 
-import { db } from "@/lib/db/schema";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -12,7 +10,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { SPECIES_LABELS, GENDER_LABELS, ANIMAL_STATUS_LABELS, normalizeAnimalSearch } from "@/lib/animal-labels";
+import { SPECIES_LABELS, GENDER_LABELS, ANIMAL_STATUS_LABELS } from "@/lib/animal-labels";
+import { useFarmAnimals, searchAnimals } from "@/lib/hooks/use-animal-search";
 import { cn } from "@/lib/utils";
 import type { Animal, Species } from "@/lib/supabase/types";
 
@@ -75,26 +74,10 @@ export function AnimalPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const animals = useLiveQuery(async () => {
-    if (!farmId) return [];
-    const rows = await db.animals.where("farm_id").equals(farmId).toArray();
-    return rows
-      .filter((a) => !a.deleted_at)
-      .filter((a) => includeInactive || a.status === "active")
-      .filter((a) => filter === "all" || a.gender === filter)
-      .filter((a) => !species || a.species === species)
-      .sort((a, b) => (a.ear_tag > b.ear_tag ? 1 : -1));
-  }, [farmId, filter, species, includeInactive]);
+  const animals = useFarmAnimals({ farmId, species, gender: filter, includeInactive });
 
   const selected = useMemo(() => animals?.find((a) => a.id === value), [animals, value]);
-
-  const filtered = useMemo(() => {
-    const q = normalizeAnimalSearch(query.trim());
-    if (!q) return animals ?? [];
-    return (animals ?? []).filter((a) =>
-      [a.ear_tag, a.name ?? "", a.breed ?? ""].some((field) => normalizeAnimalSearch(field).includes(q))
-    );
-  }, [animals, query]);
+  const filtered = useMemo(() => searchAnimals(animals ?? [], query), [animals, query]);
 
   const visibleResults = filtered.slice(0, MAX_VISIBLE_RESULTS);
   const showingNone = allowNone && !value;
@@ -117,11 +100,23 @@ export function AnimalPicker({
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" className="flex h-[85vh] flex-col">
+        {/*
+          Root cause of the "list looks stuck / can't reach the bottom"
+          bug on iPhone Safari: 85vh is computed against the LAYOUT
+          viewport, which stays the full screen height even while
+          Safari's collapsible toolbar is actually visible — so a chunk
+          of the sheet (including part of the scrollable list) rendered
+          below the true visible/touchable area. 85dvh tracks the real
+          visual viewport and shrinks/grows with the toolbar, so the
+          whole sheet — and therefore the whole list — is always within
+          reach. The safe-area padding keeps the last row clear of the
+          home-indicator area on notched iPhones.
+        */}
+        <SheetContent side="bottom" className="flex h-[85dvh] flex-col">
           <SheetHeader>
             <SheetTitle>انتخاب شماره پلاک گوش</SheetTitle>
           </SheetHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <div className="relative shrink-0">
               <Search className="absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
