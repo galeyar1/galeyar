@@ -87,6 +87,26 @@ export interface Farm {
   /** Reversible deactivation (distinct from farms_delete_owner's real hard delete) — data is untouched, only hidden from active workflows. */
   is_active: boolean;
   deactivated_at: string | null;
+  /** Herd Age Balance & Replacement Intelligence (src/lib/age-balance) — feeds ReplacementNeed's GrowthRequirement term. Null objective/target means "no target set," never inferred. */
+  herd_growth_objective: "maintain" | "grow" | "reduce" | null;
+  herd_growth_target_percent: number | null;
+}
+
+/** A farmer-recorded point-in-time snapshot of the deterministic Herd Age Balance scores (src/lib/age-balance/engine.ts) — never auto-generated or backfilled, purely for an honest historical trend once enough real snapshots accumulate. */
+export interface HerdAgeSnapshot {
+  id: string;
+  farm_id: string;
+  snapshot_date: string;
+  youth_index: number;
+  age_balance_score: number;
+  replacement_coverage_percent: number | null;
+  component_scores: Record<string, number | null>;
+  confidence: "high" | "medium" | "low" | "insufficient";
+  model_version: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
 }
 
 /**

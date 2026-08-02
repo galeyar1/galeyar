@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Dna,
   ChevronLeft,
+  CalendarClock,
 } from "lucide-react";
 
 import { db } from "@/lib/db/schema";
@@ -27,6 +28,8 @@ import { vaccinationDueStatus } from "@/lib/vaccination-alerts";
 import { daysSinceLastDeworming, dewormingOverdue } from "@/lib/deworming-alerts";
 import { computePedigreeFarmStats } from "@/lib/pedigree-stats";
 import { mostCommonExitReason, EXIT_REASON_LABELS } from "@/lib/exit-reasons";
+import { classifyLifeStage } from "@/lib/age-balance/life-stage";
+import { resolveAgeProfile } from "@/lib/age-balance/profile-resolver";
 import { isoToJalali } from "@/lib/jalali";
 import {
   feedRunningOutAlerts,
@@ -152,6 +155,15 @@ function AiCenterPageContent() {
     return mostCommonExitReason(rows, (updatedAt) => isoToJalali(updatedAt.slice(0, 10)).jy === currentJalaliYear);
   }, [farmId, today]);
 
+  // Lightweight — just a badge count, not the full deterministic engine
+  // (src/lib/age-balance/engine.ts) run for its own sake on every hub visit.
+  const seniorReviewCount = useLiveQuery(async () => {
+    if (!farmId) return 0;
+    const rows = await db.animals.where("farm_id").equals(farmId).toArray();
+    const active = rows.filter((a) => !a.deleted_at && a.status === "active");
+    return active.filter((a) => classifyLifeStage(a.birth_date, resolveAgeProfile(a.species, a.breed)) === "senior_monitoring").length;
+  }, [farmId]);
+
   const feedAlertLines = useMemo(() => {
     const lines: string[] = [];
     const currentMonthKey = today.slice(0, 7);
@@ -196,6 +208,7 @@ function AiCenterPageContent() {
     { href: "/ai/deworming", label: "ضد انگل", icon: Bug, count: dewormingAlertCount ?? null, tone: "alert" },
     { href: "/ai/herd-growth", label: "رشد گله", icon: TrendingUp, count: null, tone: "default" },
     { href: "/ai/genetics", label: "ژنتیک", icon: Dna, count: pedigreeStats?.inbreedingAlerts ?? null, tone: "alert" },
+    { href: "/ai/age-balance", label: "تعادل سنی گله", icon: CalendarClock, count: seniorReviewCount ?? null, tone: "alert" },
   ];
 
   const summaryLines: string[] = [];
