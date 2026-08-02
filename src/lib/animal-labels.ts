@@ -14,6 +14,15 @@ export const GENDER_LABELS: Record<"male" | "female", string> = {
   female: "ماده",
 };
 
+/** Fixed per-species color for the herd-composition donut/legend — a species always renders the same color regardless of data order, and sheep keeps the exact green already shown to farmers today. */
+export const SPECIES_CHART_COLORS: Record<Species, string> = {
+  sheep: "#1B5E20",
+  goat: "#C9812B",
+  cattle: "#5D4037",
+  camel: "#B08968",
+  horse: "#37474F",
+};
+
 /** Normalizes Persian/Arabic digits to Latin and lowercases, so an ear-tag/name/breed search matches regardless of which digit set or letter case the user types. Shared by every animal search UI (AnimalPicker, pedigree). */
 export function normalizeAnimalSearch(value: string): string {
   return toAsciiDigits(value).toLowerCase();

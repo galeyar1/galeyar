@@ -38,7 +38,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useSyncStatus } from "@/lib/sync/use-sync-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnimalNavIcon } from "@/components/animal-nav-icon";
-import { SPECIES_LABELS, effectiveAnimalType, portfolioColor } from "@/lib/animal-labels";
+import { SPECIES_LABELS, SPECIES_CHART_COLORS, effectiveAnimalType, portfolioColor } from "@/lib/animal-labels";
 import { feedLabel } from "@/lib/feed-labels";
 import { computePedigreeFarmStats } from "@/lib/pedigree-stats";
 import type { PedigreeAnimal } from "@/lib/pedigree";
@@ -56,7 +56,8 @@ const SPECIES_ORDER: Species[] = ["sheep", "goat", "cattle", "camel", "horse"];
 
 const CONSUMPTION_WINDOW_DAYS = 30;
 
-const CHART_COLORS = ["#1B5E20", "#66BB6A", "#A5D6A7", "#2E7D32"];
+/** Neutral placeholder ring color for the herd-composition donut when the farm has no animals yet. */
+const EMPTY_DONUT_COLOR = "#E0E0E0";
 
 function StatCard({
   icon: Icon,
@@ -284,9 +285,15 @@ export default function DashboardPage() {
     return acc;
   }, {});
 
-  const chartData = Object.entries(herdComposition).map(([species, count]) => ({
-    name: SPECIES_LABELS[species as keyof typeof SPECIES_LABELS] ?? species,
-    value: count,
+  // Sorted by SPECIES_ORDER (not object-key order) so the donut/legend layout
+  // is stable regardless of which species happens to have animals added
+  // first — colors are keyed by species identity anyway, but a stable order
+  // still keeps the legend from visually reshuffling as data changes.
+  const chartData = SPECIES_ORDER.filter((species) => herdComposition[species] > 0).map((species) => ({
+    species,
+    name: SPECIES_LABELS[species],
+    value: herdComposition[species],
+    color: SPECIES_CHART_COLORS[species],
   }));
 
   const portfolioBySpecies = SPECIES_ORDER.map((species) => {
@@ -384,18 +391,51 @@ export default function DashboardPage() {
           <CardTitle>ترکیب گله</CardTitle>
         </CardHeader>
         <CardContent>
-          {chartData.length > 0 ? (
+          <div className="relative">
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={totalActiveAnimals > 0 ? chartData : [{ name: "خالی", value: 1 }]}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={58}
+                  outerRadius={85}
+                  startAngle={90}
+                  endAngle={-270}
+                  stroke="none"
+                >
+                  {totalActiveAnimals > 0 ? (
+                    chartData.map((entry) => <Cell key={entry.species} fill={entry.color} />)
+                  ) : (
+                    <Cell fill={EMPTY_DONUT_COLOR} />
+                  )}
+                </Pie>
+                {totalActiveAnimals > 0 && <Tooltip />}
+              </PieChart>
+            </ResponsiveContainer>
+            {/* Recharts has no built-in donut center label, so this overlays plain centered text on top of the chart — the standard approach rather than pulling in another charting dependency. */}
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-bold">{toPersianDigits(totalActiveAnimals)}</span>
+              <span className="text-xs text-muted-foreground">رأس</span>
+            </div>
+          </div>
+
+          {totalActiveAnimals === 0 ? (
+            <p className="text-center text-muted-foreground">هنوز دامی ثبت نشده است.</p>
+          ) : (
             <>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={chartData} dataKey="value" nameKey="name" outerRadius={80} label>
-                    {chartData.map((_, index) => (
-                      <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {/* Species-level legend only earns its place once there's more than one species — with a single species the donut is already a single solid color and repeating "گوسفند: ۱۰۰٪" tells the farmer nothing new. */}
+              {chartData.length > 1 && (
+                <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 pb-2 text-sm">
+                  {chartData.map((s) => (
+                    <span key={s.species} className="flex items-center gap-1.5" style={{ color: s.color }}>
+                      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                      {s.name} {toPersianDigits(Math.round((s.value / totalActiveAnimals) * 100))}٪
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 pt-2 text-sm">
                 {herdCategoryPercentages.map((e) => (
                   <Link
@@ -405,13 +445,11 @@ export default function DashboardPage() {
                     style={{ backgroundColor: `${e.color}1a`, color: e.color }}
                   >
                     <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
-                    {e.label}: {toPersianDigits(e.percent)}٪
+                    {e.label} {toPersianDigits(e.count)} رأس · {toPersianDigits(e.percent)}٪
                   </Link>
                 ))}
               </div>
             </>
-          ) : (
-            <p className="text-center text-muted-foreground">هنوز دامی ثبت نشده است.</p>
           )}
         </CardContent>
       </Card>
